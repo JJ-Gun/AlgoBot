@@ -1,0 +1,9 @@
+.env
+settings.json
+*.pem
+*.wav
+*.mp3
+node_modules/
+melo-venv/
+kokoro-venv/
+__pycache__/
