@@ -7,3 +7,4 @@ node_modules/
 melo-venv/
 kokoro-venv/
 __pycache__/
+**/.DS_Store
