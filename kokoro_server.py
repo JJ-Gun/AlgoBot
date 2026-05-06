@@ -4,6 +4,10 @@ import soundfile as sf
 import tempfile
 import numpy as np
 import eng_to_ipa as ipa
+import torch
+import os
+os.environ['DNNL_DEFAULT_FPMATH_MODE'] = 'BF16'
+os.environ['LRU_CACHE_CAPACITY'] = '1024'
 
 app = Flask(__name__)
 SPEED = 0.9 # 속도 조절
