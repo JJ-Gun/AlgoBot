@@ -17,6 +17,10 @@ const client = new Client({
   ],
 });
 
+const token = process.env.NODE_ENV === 'development'
+  ? process.env.DEV_TOKEN
+  : process.env.DISCORD_TOKEN;
+
 registerInteractionHandler(client);
 registerMessageHandler(client);
 registerVoiceStateHandler(client);
@@ -24,10 +28,10 @@ registerVoiceStateHandler(client);
 client.once(Events.ClientReady, async () => {
   console.log(`✅ ${client.user.tag} 봇 온라인!`);
   try {
-    await registerCommands(client.user.id, process.env.DISCORD_TOKEN);
+    await registerCommands(client.user.id, token);
   } catch (err) {
     console.error('슬래시 명령어 등록 실패:', err);
   }
 });
 
-client.login(process.env.DISCORD_TOKEN);
+client.login(token);
