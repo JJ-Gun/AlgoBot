@@ -3,6 +3,9 @@ import os
 import re
 import io
 import time
+import torch
+torch.set_num_threads(2)
+torch.set_num_interop_threads(2)
 
 os.environ['TOKENIZERS_PARALLELISM'] = 'false'
 os.environ['LRU_CACHE_CAPACITY'] = '1024'

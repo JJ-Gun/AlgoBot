@@ -7,6 +7,9 @@ import time
 import numpy as np
 import eng_to_ipa as ipa
 import os
+import torch
+torch.set_num_threads(2)
+torch.set_num_interop_threads(2)
 
 os.environ['LRU_CACHE_CAPACITY'] = '1024'
 
