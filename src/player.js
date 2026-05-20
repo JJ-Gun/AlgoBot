@@ -6,170 +6,88 @@ import {
   AudioPlayerStatus,
   StreamType,
 } from '@discordjs/voice';
+import { Readable } from 'stream';
+import { audioPlayers, queueMode, ttsQueues } from './config.js';
+import { generateTTS } from './tts.js';
 
-import {
-  Readable,
-} from 'stream';
+const generateChains = new Map();
 
-import {
-  audioPlayers,
-  queueMode,
-  ttsQueues,
-} from './config.js';
-
-import {
-  generateTTS,
-} from './tts.js';
-
-function createBufferResource(bufferOrStream) {
-
-  if (Buffer.isBuffer(bufferOrStream)) {
-
-    return createAudioResource(
-      Readable.from(bufferOrStream),
-      {
-        inputType: StreamType.Arbitrary,
-      }
-    );
-  }
-
-  return createAudioResource(
-    bufferOrStream,
-    {
-      inputType: StreamType.Arbitrary,
-    }
-  );
+function createBufferResource(buffer) {
+  return createAudioResource(Readable.from(buffer), {
+    inputType: StreamType.Arbitrary,
+  });
 }
 
 async function processQueue(guildId) {
-
   const queue = ttsQueues.get(guildId);
-
-  if (!queue || queue.length === 0) {
-    return;
-  }
-
+  if (!queue || queue.length === 0) return;
   const player = audioPlayers.get(guildId);
-
-  if (
-    !player ||
-    player.state.status === AudioPlayerStatus.Playing
-  ) {
-    return;
-  }
-
+  if (!player || player.state.status === AudioPlayerStatus.Playing) return;
   const { audio } = queue.shift();
-
   const resource = createBufferResource(audio);
-
   player.play(resource);
-
-  player.once(
-    AudioPlayerStatus.Idle,
-    () => {
-      processQueue(guildId);
-    }
-  );
+  player.once(AudioPlayerStatus.Idle, () => {
+    processQueue(guildId);
+  });
 }
 
 export function skipTTS(guildId) {
-
   const player = audioPlayers.get(guildId);
-
-  if (!player) {
-    return false;
-  }
-
+  if (!player) return false;
   player.stop();
-
   return true;
 }
 
 export function clearQueue(guildId) {
-
   ttsQueues.set(guildId, []);
+  generateChains.set(guildId, Promise.resolve());
 }
 
-export async function playTTS(
-  text,
-  voiceKey,
-  guildId,
-  voiceChannel,
-  interaction = null
-) {
-
+export async function playTTS(text, voiceKey, guildId, voiceChannel, interaction = null) {
   let connection = getVoiceConnection(guildId);
 
   if (!connection) {
-
     connection = joinVoiceChannel({
       channelId: voiceChannel.id,
       guildId,
-      adapterCreator:
-        voiceChannel.guild.voiceAdapterCreator,
+      adapterCreator: voiceChannel.guild.voiceAdapterCreator,
     });
-
     const player = createAudioPlayer();
-
     audioPlayers.set(guildId, player);
-
     ttsQueues.set(guildId, []);
-
+    generateChains.set(guildId, Promise.resolve());
     connection.subscribe(player);
-  }
-  else {
-
-    const currentChannelId =
-      connection.joinConfig.channelId;
-
+  } else {
+    const currentChannelId = connection.joinConfig.channelId;
     if (currentChannelId !== voiceChannel.id) {
-
       if (interaction) {
-
         await interaction.reply({
-          content:
-            '봇이 이미 다른 음성 채널에서 사용 중이에요!',
+          content: '봇이 이미 다른 음성 채널에서 사용 중이에요!',
           ephemeral: true,
         });
       }
-
       return;
     }
   }
 
-  const t0 = performance.now();
-
-  const audio = await generateTTS(
-    text,
-    voiceKey
-  );
-
-  console.log(
-    `[TTS] generated ${(performance.now() - t0).toFixed(0)}ms`
-  );
-
-  const player = audioPlayers.get(guildId);
-
-  const isQueueMode =
-    queueMode.get(guildId) ?? false;
+  const isQueueMode = queueMode.get(guildId) ?? false;
 
   if (isQueueMode) {
-
-    if (!ttsQueues.has(guildId)) {
-      ttsQueues.set(guildId, []);
-    }
-
-    ttsQueues.get(guildId).push({
-      audio,
+    const prevChain = generateChains.get(guildId) ?? Promise.resolve();
+    const newChain = prevChain.then(async () => {
+      const t0 = performance.now();
+      const audio = await generateTTS(text, voiceKey);
+      console.log(`[TTS] generated ${(performance.now() - t0).toFixed(0)}ms`);
+      if (!ttsQueues.has(guildId)) ttsQueues.set(guildId, []);
+      ttsQueues.get(guildId).push({ audio });
+      processQueue(guildId);
     });
-
-    processQueue(guildId);
-  }
-  else {
-
-    const resource =
-      createBufferResource(audio);
-
-    player.play(resource);
+    generateChains.set(guildId, newChain);
+  } else {
+    const t0 = performance.now();
+    const audio = await generateTTS(text, voiceKey);
+    console.log(`[TTS] generated ${(performance.now() - t0).toFixed(0)}ms`);
+    const player = audioPlayers.get(guildId);
+    player.play(createBufferResource(audio));
   }
 }
