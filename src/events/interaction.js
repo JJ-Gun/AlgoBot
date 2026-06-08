@@ -41,10 +41,32 @@ export function registerInteractionHandler(client) {
 
     if (commandName === '채널설정') {
       await interaction.deferReply({ flags: 64 });
-      ttsChanels.set(interaction.guild.id, interaction.channel.id);
-      settings.ttsChannels[interaction.guild.id] = interaction.channel.id;
+
+      const guildId = interaction.guild.id;
+      const currentChannelId = ttsChanels.get(guildId);
+      const newChannelId = interaction.channel.id;
+      const newChannelName = interaction.channel.name;
+
+      if (currentChannelId === newChannelId) {
+        ttsChanels.delete(guildId);
+        delete settings.ttsChannels[guildId];
+        saveSettings();
+        return interaction.editReply({ content: `**#${newChannelName}** 채널 TTS 설정을 해제했습니다.` });
+      }
+
+      if (currentChannelId) {
+        const prevChannel = interaction.guild.channels.cache.get(currentChannelId);
+        const prevChannelName = prevChannel ? prevChannel.name : currentChannelId;
+        ttsChanels.set(guildId, newChannelId);
+        settings.ttsChannels[guildId] = newChannelId;
+        saveSettings();
+        return interaction.editReply({ content: `**#${prevChannelName}** 채널 해제 → **#${newChannelName}** 채널로 TTS 채널을 변경했습니다.` });
+      }
+
+      ttsChanels.set(guildId, newChannelId);
+      settings.ttsChannels[guildId] = newChannelId;
       saveSettings();
-      return interaction.editReply({ content: '이 채널을 TTS 채널로 설정했어요! 봇을 재시작해도 유지됩니다.' });
+      return interaction.editReply({ content: `**#${newChannelName}** 채널을 TTS 채널로 설정했습니다.` });
     }
 
     if (commandName === '목소리') {

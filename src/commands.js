@@ -10,7 +10,7 @@ export const commands = [
     .setDescription('봇을 음성 채널에서 퇴장시킵니다'),
   new SlashCommandBuilder()
     .setName('채널설정')
-    .setDescription('현재 채널을 TTS 채널로 설정합니다'),
+    .setDescription('현재 채널을 TTS 채널로 설정하거나 해제합니다'),
   new SlashCommandBuilder()
     .setName('목소리')
     .setDescription('목소리를 변경합니다')
