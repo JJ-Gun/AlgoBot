@@ -4,14 +4,16 @@
 <template>
   <div class="layout">
     <header class="header">
+      <div class="logo">알고봇</div>
       <nav class="nav">
-        <RouterLink to="/">공지사항</RouterLink>
-        <RouterLink to="/voice">목소리</RouterLink>
-        <RouterLink to="/settings">설정</RouterLink>
+        <RouterLink to="/">홈</RouterLink>
+        <RouterLink to="/notice">공지사항</RouterLink>
+        <RouterLink to="/voice">목소리 · 설정</RouterLink>
         <RouterLink to="/inquiry">문의</RouterLink>
       </nav>
       <div class="auth">
-        <n-button>Discord 로그인</n-button>
+        <div class="avatar">JJ</div>
+        <span class="username">jayden</span>
       </div>
     </header>
     <main class="main">
@@ -32,8 +34,14 @@
   align-items: center;
   justify-content: space-between;
   padding: 0 24px;
-  height: 60px;
-  border-bottom: 1px solid #eee;
+  height: 56px;
+  border-bottom: 0.5px solid var(--n-border-color);
+  background: #fff;
+}
+
+.logo {
+  font-size: 15px;
+  font-weight: 500;
 }
 
 .nav {
@@ -42,16 +50,41 @@
 }
 
 .nav a {
+  font-size: 14px;
   text-decoration: none;
-  color: inherit;
+  color: var(--n-text-color-3);
 }
 
 .nav a.router-link-active {
-  font-weight: bold;
+  font-weight: 500;
+  color: var(--n-text-color);
+}
+
+.auth {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: #e6f1fb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 500;
+  color: #185fa5;
+}
+
+.username {
+  font-size: 13px;
 }
 
 .main {
   flex: 1;
-  padding: 24px;
+  background: #f5f5f5;
 }
 </style>

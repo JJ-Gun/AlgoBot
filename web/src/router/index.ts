@@ -11,8 +11,8 @@ const router = createRouter({
       children: [
         { path: '', component: () => import('@/pages/user/Home.vue') },
         { path: 'voice', component: () => import('@/pages/user/Voice.vue') },
-        { path: 'settings', component: () => import('@/pages/user/Settings.vue') },
         { path: 'inquiry', component: () => import('@/pages/user/Inquiry.vue') },
+        { path: 'notice', component: () => import('@/pages/user/Notice.vue')},
       ],
     },
     {
