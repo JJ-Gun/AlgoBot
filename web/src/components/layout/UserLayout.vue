@@ -6,7 +6,7 @@
     <header class="header">
       <div class="logo">알고봇</div>
       <nav class="nav">
-        <RouterLink to="/">홈</RouterLink>
+        <RouterLink to="/" active-class="" exact-active-class="router-link-active">홈</RouterLink>
         <RouterLink to="/notice">공지사항</RouterLink>
         <RouterLink to="/voice">목소리 · 설정</RouterLink>
         <RouterLink to="/inquiry">문의</RouterLink>
@@ -35,7 +35,7 @@
   justify-content: space-between;
   padding: 0 24px;
   height: 56px;
-  border-bottom: 0.5px solid var(--n-border-color);
+  border-bottom: 0.5px solid #e8e8e8;
   background: #fff;
 }
 
@@ -46,18 +46,21 @@
 
 .nav {
   display: flex;
-  gap: 24px;
+  gap: 4px;
 }
 
 .nav a {
   font-size: 14px;
   text-decoration: none;
-  color: var(--n-text-color-3);
+  color: #888;
+  padding: 6px 14px;
+  border-radius: 8px;
 }
 
 .nav a.router-link-active {
   font-weight: 500;
-  color: var(--n-text-color);
+  color: #333;
+  background: #f5f5f5;
 }
 
 .auth {
