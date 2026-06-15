@@ -1,0 +1,76 @@
+import { Router } from 'express'
+import axios from 'axios'
+import jwt from 'jsonwebtoken'
+import db from '../db/index.js'
+
+const router = Router()
+
+const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID
+const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET
+const DISCORD_REDIRECT_URI = process.env.DISCORD_REDIRECT_URI
+const ADMIN_ID = process.env.ADMIN_DISCORD_ID
+
+router.get('/discord', (req, res) => {
+  const params = new URLSearchParams({
+    client_id: DISCORD_CLIENT_ID,
+    redirect_uri: DISCORD_REDIRECT_URI,
+    response_type: 'code',
+    scope: 'identify',
+  })
+  res.redirect(`https://discord.com/oauth2/authorize?${params}`)
+})
+
+router.get('/discord/callback', async (req, res) => {
+  const { code } = req.query
+  if (!code) return res.status(400).json({ error: 'code가 없습니다.' })
+
+  try {
+    const tokenRes = await axios.post('https://discord.com/api/oauth2/token', new URLSearchParams({
+      client_id: DISCORD_CLIENT_ID,
+      client_secret: DISCORD_CLIENT_SECRET,
+      grant_type: 'authorization_code',
+      code,
+      redirect_uri: DISCORD_REDIRECT_URI,
+    }), {
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+    })
+
+    const { access_token } = tokenRes.data
+
+    const userRes = await axios.get('https://discord.com/api/users/@me', {
+      headers: { Authorization: `Bearer ${access_token}` }
+    })
+
+    const { id, username, avatar } = userRes.data
+    const is_admin = id === ADMIN_ID ? 1 : 0
+
+    db.prepare(`
+      INSERT INTO users (id, username, avatar, is_admin)
+      VALUES (?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET username=excluded.username, avatar=excluded.avatar
+    `).run(id, username, avatar, is_admin)
+
+    const token = jwt.sign({ id, username, avatar, is_admin }, process.env.JWT_SECRET, { expiresIn: '7d' })
+
+    res.redirect(`${process.env.WEB_URL}/auth/callback?token=${token}`)
+  } catch (err) {
+    console.error('Discord OAuth 오류:', err)
+    res.status(500).json({ error: 'OAuth 처리 중 오류가 발생했습니다.' })
+  }
+})
+
+router.get('/me', (req, res) => {
+  const token = req.headers.authorization?.split(' ')[1]
+  if (!token) return res.status(401).json({ error: '인증이 필요합니다.' })
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET)
+    const user = db.prepare('SELECT * FROM users WHERE id = ?').get(decoded.id)
+    if (!user) return res.status(404).json({ error: '유저를 찾을 수 없습니다.' })
+    res.json(user)
+  } catch {
+    res.status(401).json({ error: '유효하지 않은 토큰입니다.' })
+  }
+})
+
+export default router
