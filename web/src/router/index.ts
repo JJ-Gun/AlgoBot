@@ -6,6 +6,10 @@ const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
     {
+      path: '/auth/callback',
+      component: () => import('@/pages/Callback.vue'),
+    },
+    {
       path: '/',
       component: UserLayout,
       children: [

@@ -1,11 +1,15 @@
 <script setup lang="ts">
+import { useUserStore } from '@/stores/user'
+
+const userStore = useUserStore()
 </script>
 
 <template>
   <div class="home">
     <div class="greeting">
-      <h2>안녕하세요, jayden님!</h2>
-      <p>알고봇 설정을 관리하세요.</p>
+        <h2 v-if="userStore.isLoggedIn">안녕하세요, {{ userStore.user?.username }}님!</h2>
+        <h2 v-else>알고봇에 오신 것을 환영합니다</h2>
+        <p>알고봇 설정을 관리하세요.</p>
     </div>
     <div class="grid">
       <div class="card">
@@ -61,27 +65,32 @@
       </div>
     </div>
     <div class="card settings-card">
-      <div class="card-header">
-        <div class="card-title">
-          <n-icon size="16"><i class="ti ti-microphone" /></n-icon>
-          내 설정
+        <div class="card-header">
+            <div class="card-title">
+            <n-icon size="16"><i class="ti ti-microphone" /></n-icon>
+            내 설정
+            </div>
+            <RouterLink v-if="userStore.isLoggedIn" to="/voice" class="card-link">변경 →</RouterLink>
         </div>
-        <RouterLink to="/voice" class="card-link">변경 →</RouterLink>
-      </div>
-      <div class="settings-row">
-        <div>
-          <div class="settings-label">현재 목소리</div>
-          <div class="settings-meta">한국어 남성 · edge-tts</div>
+        <template v-if="userStore.isLoggedIn">
+            <div class="settings-row">
+            <div>
+                <div class="settings-label">현재 목소리</div>
+                <div class="settings-meta">한국어 남성 · edge-tts</div>
+            </div>
+            <div class="settings-right">
+                <span class="settings-val">인준</span>
+                <n-tag size="small" type="info">사용중</n-tag>
+            </div>
+            </div>
+            <div class="settings-row settings-speed">
+            <div class="settings-label">재생 속도</div>
+            <div class="settings-val">1.0x</div>
+            </div>
+        </template>
+        <div v-else class="login-required">
+            설정을 보려면 로그인이 필요합니다.
         </div>
-        <div class="settings-right">
-          <span class="settings-val">인준</span>
-          <n-tag size="small" type="info">사용중</n-tag>
-        </div>
-      </div>
-      <div class="settings-row settings-speed">
-        <div class="settings-label">재생 속도</div>
-        <div class="settings-val">1.0x</div>
-      </div>
     </div>
   </div>
 </template>
@@ -228,4 +237,12 @@
 .settings-speed {
   margin-top: 0;
 }
+
+.login-required {
+  font-size: 13px;
+  color: #aaa;
+  padding: 16px 0;
+  text-align: center;
+}
+
 </style>

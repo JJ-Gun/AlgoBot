@@ -5,15 +5,20 @@ import db from '../db/index.js'
 
 const router = Router()
 
-const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID
-const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET
-const DISCORD_REDIRECT_URI = process.env.DISCORD_REDIRECT_URI
-const ADMIN_ID = process.env.ADMIN_DISCORD_ID
+function getOAuthConfig() {
+  const isDev = process.env.NODE_ENV === 'development'
+  return {
+    clientId: isDev ? process.env.DEV_DISCORD_CLIENT_ID : process.env.DISCORD_CLIENT_ID,
+    clientSecret: isDev ? process.env.DEV_DISCORD_CLIENT_SECRET : process.env.DISCORD_CLIENT_SECRET,
+    redirectUri: isDev ? process.env.DEV_DISCORD_REDIRECT_URI : process.env.DISCORD_REDIRECT_URI,
+  }
+}
 
 router.get('/discord', (req, res) => {
+  const { clientId, redirectUri } = getOAuthConfig()
   const params = new URLSearchParams({
-    client_id: DISCORD_CLIENT_ID,
-    redirect_uri: DISCORD_REDIRECT_URI,
+    client_id: clientId,
+    redirect_uri: redirectUri,
     response_type: 'code',
     scope: 'identify',
   })
@@ -24,13 +29,15 @@ router.get('/discord/callback', async (req, res) => {
   const { code } = req.query
   if (!code) return res.status(400).json({ error: 'code가 없습니다.' })
 
+  const { clientId, clientSecret, redirectUri } = getOAuthConfig()
+
   try {
     const tokenRes = await axios.post('https://discord.com/api/oauth2/token', new URLSearchParams({
-      client_id: DISCORD_CLIENT_ID,
-      client_secret: DISCORD_CLIENT_SECRET,
+      client_id: clientId,
+      client_secret: clientSecret,
       grant_type: 'authorization_code',
       code,
-      redirect_uri: DISCORD_REDIRECT_URI,
+      redirect_uri: redirectUri,
     }), {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
     })
@@ -42,7 +49,7 @@ router.get('/discord/callback', async (req, res) => {
     })
 
     const { id, username, avatar } = userRes.data
-    const is_admin = id === ADMIN_ID ? 1 : 0
+    const is_admin = id === process.env.ADMIN_DISCORD_ID ? 1 : 0
 
     db.prepare(`
       INSERT INTO users (id, username, avatar, is_admin)
