@@ -2,6 +2,8 @@
 
 Discord 음성 채널에서 텍스트를 읽어주는 TTS(Text-to-Speech) 봇입니다.
 
+[업데이트 로그 바로가기](#업데이트-로그)
+
 ---
 
 ## 프로젝트 배경
@@ -208,3 +210,170 @@ NODE_ENV=production
 ```
 
 `NODE_ENV=development`로 설정하면 `DEV_TOKEN`을 사용하는 개발용 봇(아루고수-dev)으로 실행됩니다.
+
+---
+
+## 웹페이지
+
+봇 설정을 웹에서도 관리할 수 있도록 Vue 3 기반 웹페이지를 추가했습니다. Discord OAuth로 로그인하며, 사용자 페이지(목소리/속도 설정, 공지사항, 문의)와 관리자 페이지(사용량 대시보드, 봇 상태, 에러 로그, 문의/공지 관리)로 구성됩니다.
+
+### 구성
+
+- **프론트엔드**: Vue 3 + TypeScript + Vite + Vue Router + Pinia + Naive UI + Chart.js
+- **백엔드**: 기존 Node.js 봇 프로세스에 Express 추가 (별도 프로세스 아님)
+- **DB**: SQLite (better-sqlite3, WAL 모드)
+- **인증**: Discord OAuth2 + JWT
+
+### 파일 구조
+
+```
+AlgoBot/
+├── web/                         # Vue 3 프론트엔드
+│   ├── src/
+│   │   ├── pages/
+│   │   │   ├── user/            # Home, Notice, Voice, Inquiry
+│   │   │   └── admin/           # Dashboard, Status, Logs, Notice, Inquiry
+│   │   ├── components/layout/   # UserLayout, AdminLayout
+│   │   ├── stores/user.ts       # Pinia 유저 스토어 (로그인 상태, JWT)
+│   │   └── router/index.ts      # 라우터 + 관리자 권한 가드
+│   └── .env                     # VITE_API_URL
+├── server/                      # Express 백엔드
+│   ├── index.js                 # 서버 진입점
+│   ├── routes/                  # auth, user, notice, inquiry, admin/*
+│   ├── middleware/               # JWT 인증, 관리자 권한 체크
+│   └── db/                      # SQLite 스키마 및 연결
+```
+
+### 실행
+
+```bash
+# 백엔드
+npm run dev:server
+
+# 프론트엔드
+cd web
+npm run dev -- --host
+```
+
+### 환경 변수 (.env, 기존 항목에 추가)
+
+```
+NODE_ENV=production
+
+# Discord OAuth 운영용
+DISCORD_CLIENT_ID=
+DISCORD_CLIENT_SECRET=
+DISCORD_REDIRECT_URI=http://EC2_IP:3000/auth/discord/callback
+
+# Discord OAuth 개발용
+DEV_DISCORD_CLIENT_ID=
+DEV_DISCORD_CLIENT_SECRET=
+DEV_DISCORD_REDIRECT_URI=http://localhost:3000/auth/discord/callback
+
+# 공통
+ADMIN_DISCORD_ID=
+JWT_SECRET=
+
+# Server
+SERVER_PORT=3000
+WEB_URL=http://EC2_IP:5173
+```
+
+`web/.env`에는 `VITE_API_URL`로 백엔드 주소를 지정합니다.
+
+---
+
+## 업데이트 로그
+
+<details>
+<summary><strong>2026-06-17</strong> — Discord 로그인 지원</summary>
+
+* 웹페이지에서 Discord 계정으로 로그인할 수 있게 되었습니다.
+  * 새로고침하거나 다시 접속해도 로그인 상태가 유지됩니다.
+  * 로그인하면 프로필 사진과 이름이 화면에 표시됩니다.
+* 화면 레이아웃이 개선되었습니다.
+  * 로그인 전/후에도 메뉴 위치가 흔들리지 않도록 정리했습니다.
+* 관리자 페이지가 보호됩니다.
+  * 로그인 및 권한이 있는 계정만 접근할 수 있습니다.
+* 재로그인 속도가 개선되었습니다.
+  * 동의 화면이 더 빠르게 지나가도록 했습니다.
+
+</details>
+
+<details>
+<summary><strong>2026-06-15</strong> — 목소리/속도 설정, 문의 기능 개선</summary>
+
+* 목소리·속도 설정 방식이 개선되었습니다.
+  * 슬라이더로 재생 속도를 조절할 수 있습니다.
+  * 미리듣기로 먼저 확인한 뒤 "적용" 버튼을 눌러야 실제로 반영됩니다.
+  * 의도치 않게 설정이 바뀌는 일이 없도록 했습니다.
+  * 현재 사용 중인 목소리가 스크롤해도 항상 상단에 보입니다.
+* 공지사항 화면이 개선되었습니다.
+  * 목록에서는 한 줄만 보이고, 클릭하면 펼쳐서 전체 내용을 볼 수 있습니다.
+  * 여러 개를 동시에 펼쳐볼 수 있습니다.
+* 문의 기능이 개선되었습니다.
+  * 문의하기가 팝업 형태로 바뀌어 더 간단하게 작성할 수 있습니다.
+  * 문의 목록에서 다른 사람이 남긴 문의 내용과 답변 상태를 함께 볼 수 있습니다.
+* 관리자 페이지가 추가되었습니다.
+  * 사용량 대시보드(목소리별 비율, 시간대별 사용량, 일별 추이)
+  * 서버 상태, 에러 로그
+  * 문의/공지 관리 화면
+
+</details>
+
+<details>
+<summary><strong>2026-06-12</strong> — 웹페이지 첫 공개</summary>
+
+* Discord 봇 설정을 웹브라우저에서도 관리할 수 있는 웹페이지가 새로 생겼습니다.
+  * 홈, 공지사항, 목소리·설정, 문의 페이지를 이용할 수 있습니다.
+
+</details>
+
+<details>
+<summary><strong>2026-06-10</strong> — 관리자 페이지 준비</summary>
+
+* 운영자가 사용량과 봇 상태를 확인할 수 있는 관리자 페이지를 준비 중입니다.
+
+</details>
+
+<details>
+<summary><strong>2026-06-08</strong> — 채널 설정 사용성 개선</summary>
+
+* `/채널설정` 동작이 더 편리해졌습니다.
+  * 다시 실행하면 같은 채널이면 설정이 해제됩니다.
+  * 다른 채널이면 기존 설정을 해제하고 새로 설정됩니다.
+  * 어떤 채널이 해제/설정됐는지 메시지로 안내합니다.
+
+</details>
+
+<details>
+<summary><strong>2026-05-20</strong> — 안정성 개선</summary>
+
+* TTS 생성과 재생 과정의 안정성이 개선되었습니다.
+
+</details>
+
+<details>
+<summary><strong>2026-05-11</strong> — 로컬 TTS 속도 개선</summary>
+
+* MeloTTS, Kokoro의 응답 속도가 개선되었습니다.
+  * 음성을 생성할 때 디스크에 파일을 저장하지 않고 메모리에서 바로 처리하도록 변경했습니다.
+
+</details>
+
+<details>
+<summary><strong>2026-05-08</strong> — MeloTTS 안정성 개선</summary>
+
+* MeloTTS 엔진의 안정성이 개선되었습니다.
+
+</details>
+
+<details>
+<summary><strong>2026-05-06</strong> — 개발 환경 분리</summary>
+
+* 운영 중인 봇과 별개로 개발용 봇이 분리되었습니다.
+  * 새 기능을 더 안전하게 테스트할 수 있습니다.
+* 첫 TTS 요청 지연이 줄었습니다.
+  * 엔진을 미리 준비해두는 워밍업 과정을 추가했습니다.
+
+</details>
