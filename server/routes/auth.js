@@ -21,6 +21,7 @@ router.get('/discord', (req, res) => {
     redirect_uri: redirectUri,
     response_type: 'code',
     scope: 'identify',
+    prompt: 'none',
   })
   res.redirect(`https://discord.com/oauth2/authorize?${params}`)
 })

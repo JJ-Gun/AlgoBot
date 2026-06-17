@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import UserLayout from '@/components/layout/UserLayout.vue'
 import AdminLayout from '@/components/layout/AdminLayout.vue'
+import { useUserStore } from '@/stores/user'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -31,6 +32,18 @@ const router = createRouter({
       ],
     },
   ],
+})
+
+router.beforeEach((to) => {
+  if (to.path.startsWith('/admin')) {
+    const userStore = useUserStore()
+    if (!userStore.isLoggedIn) {
+      return '/'
+    }
+    if (!userStore.isAdmin) {
+      return '/'
+    }
+  }
 })
 
 export default router

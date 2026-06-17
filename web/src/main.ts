@@ -10,10 +10,11 @@ const app = createApp(App)
 const pinia = createPinia()
 
 app.use(pinia)
-app.use(router)
-app.use(naive)
 
 const userStore = useUserStore()
-userStore.fetchUser()
 
-app.mount('#app')
+userStore.fetchUser().finally(() => {
+  app.use(router)
+  app.use(naive)
+  app.mount('#app')
+})
