@@ -10,7 +10,7 @@ function getAvatarUrl(): string | null {
 }
 
 function login() {
-  window.location.href = 'http://localhost:3000/auth/discord'
+  window.location.href = `${import.meta.env.VITE_API_URL}/auth/discord`
 }
 
 function logout() {

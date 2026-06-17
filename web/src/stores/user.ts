@@ -18,7 +18,7 @@ export const useUserStore = defineStore('user', () => {
   async function fetchUser() {
     if (!token.value) return
     try {
-      const res = await fetch('http://localhost:3000/auth/me', {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/auth/me`, {
         headers: { Authorization: `Bearer ${token.value}` }
       })
       if (!res.ok) throw new Error('인증 실패')
