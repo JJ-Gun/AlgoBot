@@ -34,8 +34,8 @@ router.get('/', (req, res) => {
   `).all(...params)
 
   const byDay = db.prepare(`
-    SELECT date(created_at) as day, COUNT(*) as count FROM tts_logs ${whereClause}
-    WHERE created_at >= date('now', '-30 days')
+    SELECT date(created_at) as day, COUNT(*) as count FROM tts_logs
+    WHERE created_at >= date('now', '-30 days') ${filter && filter !== '전체' ? 'AND engine = ?' : ''}
     GROUP BY day ORDER BY day
   `).all(...params)
 

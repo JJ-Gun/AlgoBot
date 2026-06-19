@@ -12,6 +12,7 @@ import adminStatusRouter from './routes/admin/status.js'
 import adminLogsRouter from './routes/admin/logs.js'
 import adminNoticeRouter from './routes/admin/notice.js'
 import adminInquiryRouter from './routes/admin/inquiry.js'
+import { startHealthMonitor } from './db/healthMonitor.js'
 
 dotenv.config()
 
@@ -34,6 +35,7 @@ app.use('/admin/inquiries', authMiddleware, adminMiddleware, adminInquiryRouter)
 
 app.listen(PORT, () => {
   console.log(`서버 실행 중: http://localhost:${PORT}`)
+  startHealthMonitor()
 })
 
 export default app

@@ -75,6 +75,9 @@ def text_to_kokoro(text):
             result.append(token)
     return ''.join(result)
 
+@app.route('/health', methods=['GET'])
+def health():
+    return {'status': 'ok'}, 200
 
 @app.route('/tts', methods=['POST'])
 def synthesize():

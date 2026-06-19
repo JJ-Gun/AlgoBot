@@ -1,11 +1,25 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
+import { useUserStore } from '@/stores/user'
 
-const inquiries = ref([
-  { id: 1, title: '목소리 추가 요청드립니다', type: '기능 제안', status: 'reviewing', date: '2026. 06. 08', content: '다양한 목소리가 추가되면 좋겠습니다.', reply: '' },
-  { id: 2, title: 'TTS 끊김 버그 리포트', type: '버그 리포트', status: 'resolved', date: '2026. 05. 30', content: '가끔 TTS가 중간에 끊깁니다.', reply: '수정 완료했습니다.' },
-  { id: 3, title: '속도 조절 기능 문의', type: '기타 문의', status: 'pending', date: '2026. 05. 15', content: '속도 조절은 어디서 하나요?', reply: '' },
-])
+interface Inquiry {
+  id: number
+  user_id: string
+  username: string
+  type: string
+  title: string
+  content: string
+  reply: string
+  status: string
+  created_at: string
+}
+
+const route = useRoute()
+const userStore = useUserStore()
+
+const inquiries = ref<Inquiry[]>([])
+const loading = ref(true)
 
 const statusMap: Record<string, { label: string; type: 'default' | 'info' | 'success' | 'warning' | 'error' }> = {
   pending: { label: '대기중', type: 'default' },
@@ -24,16 +38,79 @@ function toggle(id: number) {
   expanded.value = new Set(expanded.value)
 }
 
+function formatDate(dateStr: string) {
+  return dateStr.slice(0, 10).replace(/-/g, '. ')
+}
+
+async function loadInquiries() {
+  try {
+    const res = await fetch(`${import.meta.env.VITE_API_URL}/inquiries`)
+    inquiries.value = await res.json()
+
+    const targetId = Number(route.query.id)
+    if (targetId && inquiries.value.some(i => i.id === targetId)) {
+      expanded.value.add(targetId)
+      expanded.value = new Set(expanded.value)
+    }
+  } catch (err) {
+    console.error('문의 목록 로딩 실패:', err)
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(loadInquiries)
+
 const showModal = ref(false)
 const form = ref({ type: '버그 리포트', title: '', content: '' })
 const typeOptions = ['버그 리포트', '기능 제안', '기타 문의']
+const submitting = ref(false)
+const submitError = ref('')
+
+async function submit() {
+  if (!form.value.title.trim() || !form.value.content.trim()) {
+    submitError.value = '제목과 내용을 입력해 주세요.'
+    return
+  }
+  submitError.value = ''
+  submitting.value = true
+  try {
+    const res = await fetch(`${import.meta.env.VITE_API_URL}/inquiries`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${userStore.token}`,
+      },
+      body: JSON.stringify(form.value),
+    })
+    if (!res.ok) throw new Error('제출 실패')
+
+    form.value = { type: '버그 리포트', title: '', content: '' }
+    showModal.value = false
+    await loadInquiries()
+  } catch (err) {
+    submitError.value = '제출 중 오류가 발생했습니다.'
+    console.error(err)
+  } finally {
+    submitting.value = false
+  }
+}
 </script>
 
 <template>
   <div class="inquiry">
     <div class="page-header">
       <h2>문의</h2>
-      <n-button type="info" size="small" @click="showModal = true">문의하기</n-button>
+      <n-button
+        type="info"
+        size="small"
+        :disabled="!userStore.isLoggedIn"
+        @click="showModal = true"
+      >문의하기</n-button>
+    </div>
+
+    <div v-if="!userStore.isLoggedIn" class="login-notice">
+      문의를 작성하려면 로그인이 필요합니다.
     </div>
 
     <n-modal v-model:show="showModal" preset="card" title="문의하기" style="max-width: 480px;">
@@ -56,21 +133,27 @@ const typeOptions = ['버그 리포트', '기능 제안', '기타 문의']
             size="small"
           />
         </div>
+        <div v-if="submitError" class="form-error">{{ submitError }}</div>
         <div class="form-footer">
           <n-button size="small" @click="showModal = false">취소</n-button>
-          <n-button type="info" size="small">제출</n-button>
+          <n-button type="info" size="small" :disabled="submitting" @click="submit">
+            {{ submitting ? '제출 중...' : '제출' }}
+          </n-button>
         </div>
       </div>
     </n-modal>
 
-    <div class="inquiry-list">
+    <div v-if="loading" class="loading-notice">불러오는 중...</div>
+    <div v-else-if="inquiries.length === 0" class="empty-notice">등록된 문의가 없습니다.</div>
+
+    <div v-else class="inquiry-list">
       <div v-for="inq in inquiries" :key="inq.id" class="inquiry-card">
         <div class="inquiry-top" @click="toggle(inq.id)">
           <div class="inquiry-info">
             <div class="inquiry-title">{{ inq.title }}</div>
             <div class="inquiry-meta">
               <span>{{ inq.type }}</span>
-              <span>{{ inq.date }}</span>
+              <span>{{ formatDate(inq.created_at) }}</span>
             </div>
           </div>
           <n-tag :type="statusMap[inq.status]?.type ?? 'default'" size="small">
@@ -117,6 +200,24 @@ const typeOptions = ['버그 리포트', '기능 제안', '기타 문의']
   margin: 0;
 }
 
+.login-notice {
+  font-size: 13px;
+  color: #aaa;
+  background: #fff;
+  border: 0.5px solid #e8e8e8;
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+}
+
+.loading-notice,
+.empty-notice {
+  font-size: 13px;
+  color: #aaa;
+  padding: 24px 0;
+  text-align: center;
+}
+
 .form-inner {
   display: flex;
   flex-direction: column;
@@ -132,6 +233,11 @@ const typeOptions = ['버그 리포트', '기능 제안', '기타 문의']
 .form-label {
   font-size: 12px;
   color: #aaa;
+}
+
+.form-error {
+  font-size: 12px;
+  color: #d03050;
 }
 
 .form-footer {

@@ -96,7 +96,7 @@ export function registerInteractionHandler(client) {
       await interaction.deferReply({ flags: 64 });
       const voiceKey = userVoices.get(interaction.user.id) || DEFAULT_VOICE;
       try {
-        await playTTS(text, voiceKey, interaction.guild.id, voiceChannel, interaction);
+        await playTTS(text, voiceKey, interaction.guild.id, voiceChannel, interaction, interaction.user.id);
         await interaction.editReply({ content: '재생 중!' });
       } catch (err) {
         console.error('TTS 오류:', err);

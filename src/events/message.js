@@ -29,7 +29,7 @@ export function registerMessageHandler(client) {
 
     const voiceKey = userVoices.get(message.author.id) || DEFAULT_VOICE;
     try {
-      await playTTS(message.content, voiceKey, message.guild.id, voiceChannel);
+      await playTTS(message.content, voiceKey, message.guild.id, voiceChannel, null, message.author.id);
     } catch (err) {
       console.error('TTS 오류:', err);
       message.react('<:speakfail:1498223231369482381>').catch(() => {});

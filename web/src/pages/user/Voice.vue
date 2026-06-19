@@ -1,40 +1,91 @@
 <script setup lang="ts">
-import { ref, computed, nextTick } from 'vue'
+import { ref, computed, onMounted, nextTick } from 'vue'
+import { useUserStore } from '@/stores/user'
 
-interface Voice {
-  id: string
-  name: string
-  meta: string
-  selected: boolean
-  appliedSpeed: number
+interface VoiceOption {
+  key: string
+  lang: string
+  displayName: string
+  engine: string
+}
+
+interface VoiceState extends VoiceOption {
   draftSpeed: number
   expanded: boolean
 }
 
-const voices = ref<Voice[]>([
-  { id: 'ko-InJoon', name: '인준', meta: '한국어 남성 · edge-tts', selected: true, appliedSpeed: 10, draftSpeed: 10, expanded: false },
-  { id: 'ko-SunHi', name: '선희', meta: '한국어 여성 · edge-tts', selected: false, appliedSpeed: 10, draftSpeed: 10, expanded: false },
-  { id: 'ko-Hyunsu', name: '현수', meta: '한국어 남성 · edge-tts', selected: false, appliedSpeed: 10, draftSpeed: 10, expanded: false },
-  { id: 'ko-local', name: '로컬', meta: '한국어 · MeloTTS', selected: false, appliedSpeed: 10, draftSpeed: 10, expanded: false },
-  { id: 'af_heart', name: 'Heart', meta: '영어 여성 · Kokoro', selected: false, appliedSpeed: 10, draftSpeed: 10, expanded: false },
-  { id: 'af_bella', name: 'Bella', meta: '영어 여성 · Kokoro', selected: false, appliedSpeed: 10, draftSpeed: 10, expanded: false },
-  { id: 'am_adam', name: 'Adam', meta: '영어 남성 · Kokoro', selected: false, appliedSpeed: 10, draftSpeed: 10, expanded: false },
-  { id: 'am_michael', name: 'Michael', meta: '영어 남성 · Kokoro', selected: false, appliedSpeed: 10, draftSpeed: 10, expanded: false },
-])
+const userStore = useUserStore()
 
-const filters = ['전체', 'edge-tts', 'MeloTTS', 'Kokoro']
+const voices = ref<VoiceState[]>([])
+const currentVoiceKey = ref<string | null>(null)
+const currentSpeed = ref(10)
+const loading = ref(true)
+const saving = ref<string | null>(null)
+
+const filters = ref<string[]>(['전체'])
 const activeFilter = ref('전체')
 
 const filteredVoices = computed(() => {
   if (activeFilter.value === '전체') return voices.value
-  return voices.value.filter(v => v.meta.includes(activeFilter.value))
+  return voices.value.filter(v => v.engine === activeFilter.value)
 })
 
-const currentVoice = computed(() => voices.value.find(v => v.selected))
+const currentVoice = computed(() => voices.value.find(v => v.key === currentVoiceKey.value))
 
-const PAD = 8
+const engineLabel: Record<string, string> = {
+  edge: 'edge-tts',
+  melo: 'MeloTTS',
+  kokoro: 'Kokoro',
+}
 
-const THUMB_W = 20
+async function loadVoices() {
+  try {
+    const res = await fetch(`${import.meta.env.VITE_API_URL}/user/voices`)
+    const data: VoiceOption[] = await res.json()
+    voices.value = data.map(v => ({ ...v, draftSpeed: 10, expanded: false }))
+
+    const engines = Array.from(new Set(data.map(v => v.engine)))
+    filters.value = ['전체', ...engines]
+  } catch (err) {
+    console.error('목소리 목록 로딩 실패:', err)
+  }
+}
+
+async function loadMySettings() {
+  if (!userStore.token) return
+  try {
+    const res = await fetch(`${import.meta.env.VITE_API_URL}/user/settings`, {
+      headers: { Authorization: `Bearer ${userStore.token}` }
+    })
+    if (!res.ok) return
+    const data = await res.json()
+    currentVoiceKey.value = data.voice_key
+    currentSpeed.value = Math.round(data.speed * 10)
+
+    const voice = voices.value.find(v => v.key === data.voice_key)
+    if (voice) voice.draftSpeed = currentSpeed.value
+  } catch (err) {
+    console.error('내 설정 로딩 실패:', err)
+  }
+}
+
+onMounted(async () => {
+  await loadVoices()
+  await loadMySettings()
+  loading.value = false
+})
+
+function toggleExpand(key: string) {
+  return async () => {
+    const voice = voices.value.find(v => v.key === key)
+    if (!voice) return
+    voice.expanded = !voice.expanded
+    if (voice.expanded) {
+      await nextTick()
+      updateBubble(key)
+    }
+  }
+}
 
 function calcBubbleLeft(input: HTMLInputElement): number {
   const min = parseFloat(input.min)
@@ -45,33 +96,40 @@ function calcBubbleLeft(input: HTMLInputElement): number {
   return 10 + 10 + pct * (trackW - 20)
 }
 
-function updateBubble(voiceId: string) {
-  const input = document.getElementById('slider-' + voiceId) as HTMLInputElement
-  const bubble = document.getElementById('bubble-' + voiceId)
+function updateBubble(key: string) {
+  const input = document.getElementById('slider-' + key) as HTMLInputElement
+  const bubble = document.getElementById('bubble-' + key)
   if (!input || !bubble) return
   bubble.style.left = calcBubbleLeft(input) + 'px'
 }
 
-async function toggleExpand(id: string) {
-  const voice = voices.value.find(v => v.id === id)
+function onSliderInput(key: string) {
+  updateBubble(key)
+}
+
+async function apply(key: string) {
+  if (!userStore.token) return
+  const voice = voices.value.find(v => v.key === key)
   if (!voice) return
-  voice.expanded = !voice.expanded
-  if (voice.expanded) {
-    await nextTick()
-    updateBubble(id)
-  }
-}
 
-function onSliderInput(event: Event, voiceId: string) {
-  updateBubble(voiceId)
-}
+  saving.value = key
+  try {
+    const res = await fetch(`${import.meta.env.VITE_API_URL}/user/settings`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${userStore.token}`,
+      },
+      body: JSON.stringify({ voice_key: key, speed: voice.draftSpeed / 10 }),
+    })
+    if (!res.ok) throw new Error('적용 실패')
 
-function apply(id: string) {
-  voices.value.forEach(v => v.selected = false)
-  const voice = voices.value.find(v => v.id === id)
-  if (voice) {
-    voice.selected = true
-    voice.appliedSpeed = voice.draftSpeed
+    currentVoiceKey.value = key
+    currentSpeed.value = voice.draftSpeed
+  } catch (err) {
+    console.error('설정 적용 실패:', err)
+  } finally {
+    saving.value = null
   }
 }
 
@@ -86,72 +144,87 @@ function getSpeedLabel(val: number) {
       <h2>목소리 · 설정</h2>
     </div>
 
-    <div class="current-card sticky-card">
-      <div class="current-left">
-        <div class="current-label">현재 사용중</div>
-        <div class="current-val">{{ currentVoice?.name }} · {{ currentVoice?.meta }}</div>
-      </div>
-      <div class="current-right">
-        <div class="current-label">재생 속도</div>
-        <div class="current-val">{{ getSpeedLabel(currentVoice?.appliedSpeed ?? 10) }}</div>
-      </div>
+    <div v-if="!userStore.isLoggedIn" class="login-notice">
+      설정을 변경하려면 로그인이 필요합니다.
     </div>
 
-    <div class="filter-row">
-      <div
-        v-for="f in filters"
-        :key="f"
-        class="filter-tag"
-        :class="{ on: activeFilter === f }"
-        @click="activeFilter = f"
-      >{{ f }}</div>
-    </div>
+    <div v-if="loading" class="loading-notice">불러오는 중...</div>
 
-    <div class="voice-list">
-      <div
-        v-for="voice in filteredVoices"
-        :key="voice.id"
-        class="voice-card"
-        :class="{ selected: voice.selected }"
-      >
-        <div class="voice-top" @click="toggleExpand(voice.id)">
-          <div class="voice-info">
-            <div class="voice-name">
-              {{ voice.name }}
-              <span v-if="voice.selected" class="selected-badge">사용중</span>
-            </div>
-            <div class="voice-meta">{{ voice.meta }}</div>
-          </div>
-          <div class="voice-actions" @click.stop>
-            <n-button size="small">미리듣기</n-button>
-            <n-button size="small" type="info" @click="apply(voice.id)">적용</n-button>
-          </div>
+    <template v-else>
+      <div v-if="currentVoice" class="current-card sticky-card">
+        <div class="current-left">
+          <div class="current-label">현재 사용중</div>
+          <div class="current-val">{{ currentVoice.displayName.replace(/^[^\s]+\s/, '') }} · {{ engineLabel[currentVoice.engine] }}</div>
         </div>
-        <div v-if="voice.expanded" class="speed-section">
-          <div class="speed-label">재생 속도</div>
-          <div class="slider-outer">
-            <div class="speed-ticks">
-              <span>0.5x</span><span>1.0x</span><span>1.5x</span><span>2.0x</span>
+        <div class="current-right">
+          <div class="current-label">재생 속도</div>
+          <div class="current-val">{{ getSpeedLabel(currentSpeed) }}</div>
+        </div>
+      </div>
+
+      <div class="filter-row">
+        <div
+          v-for="f in filters"
+          :key="f"
+          class="filter-tag"
+          :class="{ on: activeFilter === f }"
+          @click="activeFilter = f"
+        >{{ f === '전체' ? '전체' : engineLabel[f] ?? f }}</div>
+      </div>
+
+      <div class="voice-list">
+        <div
+          v-for="voice in filteredVoices"
+          :key="voice.key"
+          class="voice-card"
+          :class="{ selected: voice.key === currentVoiceKey }"
+        >
+          <div class="voice-top" @click="toggleExpand(voice.key)()">
+            <div class="voice-info">
+              <div class="voice-name">
+                {{ voice.displayName }}
+                <span v-if="voice.key === currentVoiceKey" class="selected-badge">사용중</span>
+              </div>
+              <div class="voice-meta">{{ voice.lang }} · {{ engineLabel[voice.engine] }}</div>
             </div>
-            <div class="slider-wrap">
-              <input
-                type="range"
-                min="5"
-                max="20"
-                step="1"
-                v-model="voice.draftSpeed"
-                class="slider"
-                :id="'slider-' + voice.id"
-                @input="onSliderInput($event, voice.id)"
+            <div class="voice-actions" @click.stop>
+              <n-button size="small">미리듣기</n-button>
+              <n-button
+                size="small"
+                type="info"
+                :disabled="!userStore.isLoggedIn || saving === voice.key"
+                @click="apply(voice.key)"
               >
-              <span class="speed-bubble" :id="'bubble-' + voice.id">
-                {{ getSpeedLabel(voice.draftSpeed) }}
-              </span>
+                {{ saving === voice.key ? '적용 중...' : '적용' }}
+              </n-button>
+            </div>
+          </div>
+          <div v-if="voice.expanded" class="speed-section">
+            <div class="speed-label">재생 속도</div>
+            <div class="slider-outer">
+              <div class="speed-ticks">
+                <span>0.5x</span><span>1.0x</span><span>1.5x</span><span>2.0x</span>
+              </div>
+              <div class="slider-wrap">
+                <input
+                  type="range"
+                  min="5"
+                  max="20"
+                  step="1"
+                  v-model="voice.draftSpeed"
+                  class="slider"
+                  :id="'slider-' + voice.key"
+                  @input="onSliderInput(voice.key)"
+                >
+                <span class="speed-bubble" :id="'bubble-' + voice.key">
+                  {{ getSpeedLabel(voice.draftSpeed) }}
+                </span>
+              </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
+    </template>
   </div>
 </template>
 
@@ -170,6 +243,23 @@ function getSpeedLabel(val: number) {
   font-size: 18px;
   font-weight: 500;
   margin: 0;
+}
+
+.login-notice {
+  font-size: 13px;
+  color: #aaa;
+  background: #fff;
+  border: 0.5px solid #e8e8e8;
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+}
+
+.loading-notice {
+  font-size: 13px;
+  color: #aaa;
+  padding: 24px 0;
+  text-align: center;
 }
 
 .current-card {
@@ -295,6 +385,10 @@ function getSpeedLabel(val: number) {
 .speed-label {
   font-size: 12px;
   margin-bottom: 6px;
+}
+
+.slider-outer {
+  padding: 0;
 }
 
 .speed-ticks {

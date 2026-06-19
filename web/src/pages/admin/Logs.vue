@@ -1,24 +1,55 @@
 <script setup lang="ts">
-const logs = [
-  { time: '06-10 14:32', level: 'ERROR', message: 'TTS 생성 실패 · guild: 123456' },
-  { time: '06-10 13:15', level: 'ERROR', message: 'Kokoro 서버 응답 없음' },
-  { time: '06-09 22:47', level: 'WARN', message: 'CPU 크레딧 80% 소진' },
-  { time: '06-09 18:03', level: 'ERROR', message: 'TTS 생성 실패 · guild: 789012' },
-  { time: '06-09 10:22', level: 'WARN', message: 'MeloTTS 응답 지연 2.3s' },
-  { time: '06-08 09:11', level: 'ERROR', message: 'Discord 봇 연결 끊김' },
-]
+import { ref, onMounted } from 'vue'
+import { useUserStore } from '@/stores/user'
+
+const userStore = useUserStore()
+
+interface LogEntry {
+  id: number
+  level: string
+  message: string
+  created_at: string
+}
+
+const logs = ref<LogEntry[]>([])
+const loading = ref(true)
+
+function formatTime(dateStr: string) {
+  const d = new Date(dateStr.replace(' ', 'T') + 'Z')
+  return d.toLocaleString('ko-KR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+}
+
+async function loadLogs() {
+  try {
+    const res = await fetch(`${import.meta.env.VITE_API_URL}/admin/logs`, {
+      headers: { Authorization: `Bearer ${userStore.token}` }
+    })
+    if (!res.ok) throw new Error('로그 조회 실패')
+    logs.value = await res.json()
+  } catch (err) {
+    console.error('로그 조회 실패:', err)
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(loadLogs)
 </script>
 
 <template>
   <div class="logs">
     <div class="page-title">에러 로그</div>
-    <div class="log-card">
+
+    <div v-if="loading" class="loading-notice">불러오는 중...</div>
+    <div v-else-if="logs.length === 0" class="empty-notice">기록된 로그가 없습니다.</div>
+
+    <div v-else class="log-card">
       <div
-        v-for="(log, i) in logs"
-        :key="i"
+        v-for="log in logs"
+        :key="log.id"
         class="log-row"
       >
-        <span class="log-time">{{ log.time }}</span>
+        <span class="log-time">{{ formatTime(log.created_at) }}</span>
         <span class="log-level" :class="log.level === 'ERROR' ? 'error' : 'warn'">[{{ log.level }}]</span>
         <span class="log-message" :class="log.level === 'ERROR' ? 'error' : 'warn'">{{ log.message }}</span>
       </div>
@@ -37,6 +68,14 @@ const logs = [
   font-size: 18px;
   font-weight: 500;
   margin-bottom: 20px;
+}
+
+.loading-notice,
+.empty-notice {
+  font-size: 13px;
+  color: #aaa;
+  padding: 24px 0;
+  text-align: center;
 }
 
 .log-card {

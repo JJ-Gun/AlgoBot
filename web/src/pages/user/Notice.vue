@@ -1,12 +1,18 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
 
-const notices = ref([
-  { id: 1, title: '서버 점검 안내', content: '6월 12일 오전 2시~4시 서버 점검이 예정되어 있습니다. 점검 중에는 봇 사용이 불가할 수 있습니다.6월 12일 오전 2시~4시 서버 점검이 예정되어 있습니다. 점검 중에는 봇 사용이 불가할 수 있습니다.6월 12일 오전 2시~4시 서버 점검이 예정되어 있습니다. 점검 중에는 봇 사용이 불가할 수 있습니다.6월 12일 오전 2시~4시 서버 점검이 예정되어 있습니다. 점검 중에는 봇 사용이 불가할 수 있습니다.6월 12일 오전 2시~4시 서버 점검이 예정되어 있습니다. 점검 중에는 봇 사용이 불가할 수 있습니다.6월 12일 오전 2시~4시 서버 점검이 예정되어 있습니다. 점검 중에는 봇 사용이 불가할 수 있습니다.6월 12일 오전 2시~4시 서버 점검이 예정되어 있습니다. 점검 중에는 봇 사용이 불가할 수 있습니다.6월 12일 오전 2시~4시 서버 점검이 예정되어 있습니다. 점검 중에는 봇 사용이 불가할 수 있습니다.6월 12일 오전 2시~4시 서버 점검이 예정되어 있습니다. 점검 중에는 봇 사용이 불가할 수 있습니다.6월 12일 오전 2시~4시 서버 점검이 예정되어 있습니다. 점검 중에는 봇 사용이 불가할 수 있습니다.6월 12일 오전 2시~4시 서버 점검이 예정되어 있습니다. 점검 중에는 봇 사용이 불가할 수 있습니다.', date: '2026. 06. 10' },
-  { id: 2, title: 'Kokoro 엔진 업데이트', content: 'Kokoro 엔진이 최신 버전으로 업데이트되었습니다. 한국어 발음 품질이 개선되었습니다.6월 12일 오전 2시~4시 서버 점검이 예정되어 있습니다. 점검 중에는 봇 사용이 불가할 수 있습니다.6월 12일 오전 2시~4시 서버 점검이 예정되어 있습니다. 점검 중에는 봇 사용이 불가할 수 있습니다.6월 12일 오전 2시~4시 서버 점검이 예정되어 있습니다. 점검 중에는 봇 사용이 불가할 수 있습니다.6월 12일 오전 2시~4시 서버 점검이 예정되어 있습니다. 점검 중에는 봇 사용이 불가할 수 있습니다.6월 12일 오전 2시~4시 서버 점검이 예정되어 있습니다. 점검 중에는 봇 사용이 불가할 수 있습니다.6월 12일 오전 2시~4시 서버 점검이 예정되어 있습니다. 점검 중에는 봇 사용이 불가할 수 있습니다.6월 12일 오전 2시~4시 서버 점검이 예정되어 있습니다. 점검 중에는 봇 사용이 불가할 수 있습니다.6월 12일 오전 2시~4시 서버 점검이 예정되어 있습니다. 점검 중에는 봇 사용이 불가할 수 있습니다.6월 12일 오전 2시~4시 서버 점검이 예정되어 있습니다. 점검 중에는 봇 사용이 불가할 수 있습니다.', date: '2026. 05. 20' },
-  { id: 3, title: '알고봇 출시', content: '알고봇이 정식 출시되었습니다. Discord 서버에 초대해서 사용해 보세요.', date: '2026. 04. 10' },
-])
+interface Notice {
+  id: number
+  title: string
+  content: string
+  created_at: string
+}
 
+const route = useRoute()
+
+const notices = ref<Notice[]>([])
+const loading = ref(true)
 const expanded = ref<Set<number>>(new Set())
 
 function toggle(id: number) {
@@ -17,6 +23,29 @@ function toggle(id: number) {
   }
   expanded.value = new Set(expanded.value)
 }
+
+function formatDate(dateStr: string) {
+  return dateStr.slice(0, 10).replace(/-/g, '. ')
+}
+
+async function loadNotices() {
+  try {
+    const res = await fetch(`${import.meta.env.VITE_API_URL}/notices`)
+    notices.value = await res.json()
+
+    const targetId = Number(route.query.id)
+    if (targetId && notices.value.some(n => n.id === targetId)) {
+      expanded.value.add(targetId)
+      expanded.value = new Set(expanded.value)
+    }
+  } catch (err) {
+    console.error('공지사항 로딩 실패:', err)
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(loadNotices)
 </script>
 
 <template>
@@ -24,7 +53,11 @@ function toggle(id: number) {
     <div class="page-header">
       <h2>공지사항</h2>
     </div>
-    <div class="notice-list">
+
+    <div v-if="loading" class="loading-notice">불러오는 중...</div>
+    <div v-else-if="notices.length === 0" class="empty-notice">등록된 공지사항이 없습니다.</div>
+
+    <div v-else class="notice-list">
       <div
         v-for="notice in notices"
         :key="notice.id"
@@ -33,7 +66,7 @@ function toggle(id: number) {
       >
         <div class="notice-header">
           <div class="notice-title">{{ notice.title }}</div>
-          <div class="notice-date">{{ notice.date }}</div>
+          <div class="notice-date">{{ formatDate(notice.created_at) }}</div>
         </div>
         <div class="notice-content" :class="{ expanded: expanded.has(notice.id) }">
           {{ notice.content }}
@@ -58,6 +91,14 @@ function toggle(id: number) {
   font-size: 18px;
   font-weight: 500;
   margin: 0;
+}
+
+.loading-notice,
+.empty-notice {
+  font-size: 13px;
+  color: #aaa;
+  padding: 24px 0;
+  text-align: center;
 }
 
 .notice-list {

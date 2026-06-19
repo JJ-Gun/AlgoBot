@@ -79,6 +79,9 @@ print('MeloTTS 워밍업 중...')
 infer_to_bytes('워밍업')
 print('MeloTTS 워밍업 완료!')
 
+@app.route('/health', methods=['GET'])
+def health():
+    return {'status': 'ok'}, 200
 
 @app.route('/tts', methods=['POST'])
 def synthesize():

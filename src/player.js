@@ -7,8 +7,9 @@ import {
   StreamType,
 } from '@discordjs/voice';
 import { Readable } from 'stream';
-import { audioPlayers, queueMode, ttsQueues } from './config.js';
+import { audioPlayers, queueMode, ttsQueues, VOICES } from './config.js';
 import { generateTTS } from './tts.js';
+import db from '../server/db/index.js';
 
 const generateChains = new Map();
 
@@ -16,6 +17,27 @@ function createBufferResource(buffer) {
   return createAudioResource(Readable.from(buffer), {
     inputType: StreamType.Arbitrary,
   });
+}
+
+function logTTS(guildId, userId, voiceKey) {
+  try {
+    const engine = VOICES[voiceKey]?.type ?? 'unknown';
+    db.prepare(`
+      INSERT INTO tts_logs (guild_id, user_id, voice_key, engine)
+      VALUES (?, ?, ?, ?)
+    `).run(guildId, userId, voiceKey, engine);
+  } catch (err) {
+    console.error('TTS 로그 기록 실패:', err);
+  }
+}
+
+function logError(message) {
+  console.error(message);
+  try {
+    db.prepare('INSERT INTO error_logs (level, message) VALUES (?, ?)').run('ERROR', message);
+  } catch (err) {
+    console.error('에러 로그 기록 실패:', err);
+  }
 }
 
 async function processQueue(guildId) {
@@ -43,7 +65,7 @@ export function clearQueue(guildId) {
   generateChains.set(guildId, Promise.resolve());
 }
 
-export async function playTTS(text, voiceKey, guildId, voiceChannel, interaction = null) {
+export async function playTTS(text, voiceKey, guildId, voiceChannel, interaction = null, userId = null) {
   let connection = getVoiceConnection(guildId);
 
   if (!connection) {
@@ -75,18 +97,32 @@ export async function playTTS(text, voiceKey, guildId, voiceChannel, interaction
   if (isQueueMode) {
     const prevChain = generateChains.get(guildId) ?? Promise.resolve();
     const newChain = prevChain.then(async () => {
-      const t0 = performance.now();
-      const audio = await generateTTS(text, voiceKey);
-      console.log(`[TTS] generated ${(performance.now() - t0).toFixed(0)}ms`);
+      let audio;
+      try {
+        const t0 = performance.now();
+        audio = await generateTTS(text, voiceKey);
+        console.log(`[TTS] generated ${(performance.now() - t0).toFixed(0)}ms`);
+      } catch (err) {
+        logError(`TTS 생성 실패 (${voiceKey}) · guild: ${guildId} · ${err.message}`);
+        return;
+      }
+      logTTS(guildId, userId, voiceKey);
       if (!ttsQueues.has(guildId)) ttsQueues.set(guildId, []);
       ttsQueues.get(guildId).push({ audio });
       processQueue(guildId);
     });
     generateChains.set(guildId, newChain);
   } else {
-    const t0 = performance.now();
-    const audio = await generateTTS(text, voiceKey);
-    console.log(`[TTS] generated ${(performance.now() - t0).toFixed(0)}ms`);
+    let audio;
+    try {
+      const t0 = performance.now();
+      audio = await generateTTS(text, voiceKey);
+      console.log(`[TTS] generated ${(performance.now() - t0).toFixed(0)}ms`);
+    } catch (err) {
+      logError(`TTS 생성 실패 (${voiceKey}) · guild: ${guildId} · ${err.message}`);
+      throw err;
+    }
+    logTTS(guildId, userId, voiceKey);
     const player = audioPlayers.get(guildId);
     player.play(createBufferResource(audio));
   }
