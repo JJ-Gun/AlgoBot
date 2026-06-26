@@ -4,6 +4,7 @@
 <template>
   <div class="layout">
     <aside class="sidebar">
+      <RouterLink to="/" class="back-link">← 사용자 페이지로</RouterLink>
       <div class="sidebar-title">관리자</div>
       <nav class="nav">
         <RouterLink to="/admin" active-class="" exact-active-class="router-link-active">사용량</RouterLink>
@@ -34,6 +35,12 @@
   gap: 16px;
   background: #fff;
   flex-shrink: 0;
+}
+
+.back-link {
+  font-size: 12px;
+  color: #888;
+  text-decoration: none;
 }
 
 .sidebar-title {

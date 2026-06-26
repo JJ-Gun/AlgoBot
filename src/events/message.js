@@ -1,6 +1,7 @@
 import { Events } from 'discord.js';
 import { ttsChanels, userVoices, DEFAULT_VOICE } from '../config.js';
 import { playTTS } from '../player.js';
+import { logError } from '../../server/db/logger.js';
 
 export function registerMessageHandler(client) {
   client.on(Events.MessageCreate, async (message) => {
@@ -31,7 +32,7 @@ export function registerMessageHandler(client) {
     try {
       await playTTS(message.content, voiceKey, message.guild.id, voiceChannel, null, message.author.id);
     } catch (err) {
-      console.error('TTS 오류:', err);
+      logError(`메시지 TTS 처리 실패 · guild: ${message.guild.id} · ${err.message}`);
       message.react('<:speakfail:1498223231369482381>').catch(() => {});
     }
   });

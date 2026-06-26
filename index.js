@@ -5,6 +5,17 @@ import { registerCommands } from './src/commands.js';
 import { registerInteractionHandler } from './src/events/interaction.js';
 import { registerMessageHandler } from './src/events/message.js';
 import { registerVoiceStateHandler } from './src/events/voiceState.js';
+import { logError } from './server/db/logger.js';
+
+// 어디서든 못 잡힌 예외/거부가 발생해도 프로세스를 죽이지 않고 로그만 남김
+process.on('uncaughtException', (err) => {
+  logError(`처리되지 않은 예외: ${err.message}`);
+});
+
+process.on('unhandledRejection', (reason) => {
+  const message = reason instanceof Error ? reason.message : String(reason);
+  logError(`처리되지 않은 Promise 거부: ${message}`);
+});
 
 // tts.js를 미리 import해서 TTS 엔진 초기화
 await import('./src/tts.js');
@@ -31,11 +42,13 @@ client.once(Events.ClientReady, async () => {
   try {
     await registerCommands(client.user.id, token);
   } catch (err) {
-    console.error('슬래시 명령어 등록 실패:', err);
+    logError(`슬래시 명령어 등록 실패: ${err.message}`);
   }
 });
 
-client.login(token);
+client.login(token).catch((err) => {
+  logError(`Discord 로그인 실패: ${err.message}`);
+});
 
 // 헬스체크용 내부 HTTP 서버 (Express 백엔드가 ping용으로 사용)
 const HEALTH_PORT = process.env.BOT_HEALTH_PORT || 3001;

@@ -1,27 +1,97 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
+import { useUserStore } from '@/stores/user'
 
-const notices = ref([
-  { id: 1, title: '서버 점검 안내', content: '6월 12일 오전 2시~4시 서버 점검이 예정되어 있습니다. 점검 중에는 봇 사용이 불가할 수 있습니다.', date: '2026. 06. 10' },
-  { id: 2, title: 'Kokoro 엔진 업데이트', content: 'Kokoro 엔진이 최신 버전으로 업데이트되었습니다. 한국어 발음 품질이 개선되었습니다.', date: '2026. 05. 20' },
-  { id: 3, title: '알고봇 출시', content: '알고봇이 정식 출시되었습니다. Discord 서버에 초대해서 사용해 보세요.', date: '2026. 04. 10' },
-])
+const userStore = useUserStore()
+
+interface Notice {
+  id: number
+  title: string
+  content: string
+  created_at: string
+}
+
+const notices = ref<Notice[]>([])
+const loading = ref(true)
+const saving = ref(false)
+const deleting = ref<number | null>(null)
 
 const showModal = ref(false)
 const editTarget = ref<{ id: number | null; title: string; content: string }>({ id: null, title: '', content: '' })
+
+function formatDate(dateStr: string) {
+  return dateStr.slice(0, 10).replace(/-/g, '. ')
+}
+
+async function loadNotices() {
+  try {
+    const res = await fetch(`${import.meta.env.VITE_API_URL}/admin/notices`, {
+      headers: { Authorization: `Bearer ${userStore.token}` }
+    })
+    if (!res.ok) throw new Error('공지 목록 조회 실패')
+    notices.value = await res.json()
+  } catch (err) {
+    console.error('공지 목록 로딩 실패:', err)
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(loadNotices)
 
 function openCreate() {
   editTarget.value = { id: null, title: '', content: '' }
   showModal.value = true
 }
 
-function openEdit(notice: { id: number; title: string; content: string; date: string }) {
+function openEdit(notice: Notice) {
   editTarget.value = { id: notice.id, title: notice.title, content: notice.content }
   showModal.value = true
 }
 
-function deleteNotice(id: number) {
-  notices.value = notices.value.filter(n => n.id !== id)
+async function submit() {
+  if (!editTarget.value.title.trim() || !editTarget.value.content.trim()) return
+
+  saving.value = true
+  try {
+    const url = editTarget.value.id
+      ? `${import.meta.env.VITE_API_URL}/admin/notices/${editTarget.value.id}`
+      : `${import.meta.env.VITE_API_URL}/admin/notices`
+    const method = editTarget.value.id ? 'PUT' : 'POST'
+
+    const res = await fetch(url, {
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${userStore.token}`,
+      },
+      body: JSON.stringify({ title: editTarget.value.title, content: editTarget.value.content }),
+    })
+    if (!res.ok) throw new Error('저장 실패')
+
+    showModal.value = false
+    await loadNotices()
+  } catch (err) {
+    console.error('공지 저장 실패:', err)
+  } finally {
+    saving.value = false
+  }
+}
+
+async function deleteNotice(id: number) {
+  deleting.value = id
+  try {
+    const res = await fetch(`${import.meta.env.VITE_API_URL}/admin/notices/${id}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${userStore.token}` },
+    })
+    if (!res.ok) throw new Error('삭제 실패')
+    await loadNotices()
+  } catch (err) {
+    console.error('공지 삭제 실패:', err)
+  } finally {
+    deleting.value = null
+  }
 }
 </script>
 
@@ -50,21 +120,32 @@ function deleteNotice(id: number) {
         </div>
         <div class="form-footer">
           <n-button size="small" @click="showModal = false">취소</n-button>
-          <n-button type="info" size="small">{{ editTarget.id ? '수정' : '작성' }}</n-button>
+          <n-button type="info" size="small" :disabled="saving" @click="submit">
+            {{ saving ? '저장 중...' : (editTarget.id ? '수정' : '작성') }}
+          </n-button>
         </div>
       </div>
     </n-modal>
 
-    <div class="notice-list">
+    <div v-if="loading" class="loading-notice">불러오는 중...</div>
+    <div v-else-if="notices.length === 0" class="empty-notice">등록된 공지가 없습니다.</div>
+
+    <div v-else class="notice-list">
       <div v-for="notice in notices" :key="notice.id" class="notice-card">
         <div class="notice-header">
           <div class="notice-info">
             <div class="notice-title">{{ notice.title }}</div>
-            <div class="notice-date">{{ notice.date }}</div>
+            <div class="notice-date">{{ formatDate(notice.created_at) }}</div>
           </div>
           <div class="notice-actions">
             <n-button size="small" @click="openEdit(notice)">수정</n-button>
-            <n-button size="small" @click="deleteNotice(notice.id)">삭제</n-button>
+            <n-button
+              size="small"
+              :disabled="deleting === notice.id"
+              @click="deleteNotice(notice.id)"
+            >
+              {{ deleting === notice.id ? '삭제 중...' : '삭제' }}
+            </n-button>
           </div>
         </div>
         <div class="notice-content">{{ notice.content }}</div>
@@ -91,6 +172,14 @@ function deleteNotice(id: number) {
   font-size: 18px;
   font-weight: 500;
   margin: 0;
+}
+
+.loading-notice,
+.empty-notice {
+  font-size: 13px;
+  color: #aaa;
+  padding: 24px 0;
+  text-align: center;
 }
 
 .form-inner {

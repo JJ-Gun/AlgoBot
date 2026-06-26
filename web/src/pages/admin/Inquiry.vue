@@ -1,11 +1,24 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
+import { useUserStore } from '@/stores/user'
 
-const inquiries = ref([
-  { id: 1, title: '목소리 추가 요청드립니다', type: '기능 제안', status: 'reviewing', date: '2026. 06. 08', content: '다양한 목소리가 추가되면 좋겠습니다.', reply: '' },
-  { id: 2, title: 'TTS 끊김 버그 리포트', type: '버그 리포트', status: 'resolved', date: '2026. 05. 30', content: '가끔 TTS가 중간에 끊깁니다.', reply: '수정 완료했습니다.' },
-  { id: 3, title: '속도 조절 기능 문의', type: '기타 문의', status: 'pending', date: '2026. 05. 15', content: '속도 조절은 어디서 하나요?', reply: '' },
-])
+const userStore = useUserStore()
+
+interface Inquiry {
+  id: number
+  user_id: string
+  username: string
+  type: string
+  title: string
+  content: string
+  reply: string
+  status: string
+  created_at: string
+}
+
+const inquiries = ref<Inquiry[]>([])
+const loading = ref(true)
+const saving = ref<number | null>(null)
 
 const statusMap: Record<string, { label: string; type: 'default' | 'info' | 'success' | 'warning' | 'error' }> = {
   pending: { label: '대기중', type: 'default' },
@@ -14,9 +27,56 @@ const statusMap: Record<string, { label: string; type: 'default' | 'info' | 'suc
 }
 
 const expanded = ref<number | null>(null)
+const draftReply = ref<Record<number, string>>({})
+const draftStatus = ref<Record<number, string>>({})
 
-function toggle(id: number) {
-  expanded.value = expanded.value === id ? null : id
+function toggle(inq: Inquiry) {
+  expanded.value = expanded.value === inq.id ? null : inq.id
+  if (!(inq.id in draftReply.value)) draftReply.value[inq.id] = inq.reply
+  if (!(inq.id in draftStatus.value)) draftStatus.value[inq.id] = inq.status
+}
+
+function formatDate(dateStr: string) {
+  return dateStr.slice(0, 10).replace(/-/g, '. ')
+}
+
+async function loadInquiries() {
+  try {
+    const res = await fetch(`${import.meta.env.VITE_API_URL}/admin/inquiries`, {
+      headers: { Authorization: `Bearer ${userStore.token}` }
+    })
+    if (!res.ok) throw new Error('문의 목록 조회 실패')
+    inquiries.value = await res.json()
+  } catch (err) {
+    console.error('문의 목록 로딩 실패:', err)
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(loadInquiries)
+
+async function save(inq: Inquiry) {
+  saving.value = inq.id
+  try {
+    const res = await fetch(`${import.meta.env.VITE_API_URL}/admin/inquiries/${inq.id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${userStore.token}`,
+      },
+      body: JSON.stringify({
+        reply: draftReply.value[inq.id],
+        status: draftStatus.value[inq.id],
+      }),
+    })
+    if (!res.ok) throw new Error('저장 실패')
+    await loadInquiries()
+  } catch (err) {
+    console.error('답변 저장 실패:', err)
+  } finally {
+    saving.value = null
+  }
 }
 </script>
 
@@ -24,14 +84,18 @@ function toggle(id: number) {
   <div class="inquiry">
     <div class="page-title">문의</div>
 
-    <div class="inquiry-list">
+    <div v-if="loading" class="loading-notice">불러오는 중...</div>
+    <div v-else-if="inquiries.length === 0" class="empty-notice">등록된 문의가 없습니다.</div>
+
+    <div v-else class="inquiry-list">
       <div v-for="inq in inquiries" :key="inq.id" class="inquiry-card">
-        <div class="inquiry-top" @click="toggle(inq.id)">
+        <div class="inquiry-top" @click="toggle(inq)">
           <div class="inquiry-info">
             <div class="inquiry-title">{{ inq.title }}</div>
             <div class="inquiry-meta">
+              <span>{{ inq.username }}</span>
               <span>{{ inq.type }}</span>
-              <span>{{ inq.date }}</span>
+              <span>{{ formatDate(inq.created_at) }}</span>
             </div>
           </div>
           <n-tag :type="statusMap[inq.status]?.type ?? 'default'" size="small">
@@ -47,7 +111,7 @@ function toggle(id: number) {
           <div class="detail-section">
             <div class="detail-label">답변</div>
             <n-input
-              v-model:value="inq.reply"
+              v-model:value="draftReply[inq.id]"
               type="textarea"
               placeholder="답변을 입력하세요"
               :rows="3"
@@ -56,12 +120,19 @@ function toggle(id: number) {
           </div>
           <div class="detail-footer">
             <n-select
-              v-model:value="inq.status"
+              v-model:value="draftStatus[inq.id]"
               :options="Object.entries(statusMap).map(([k, v]) => ({ label: v.label, value: k }))"
               size="small"
               style="width: 120px;"
             />
-            <n-button type="info" size="small">저장</n-button>
+            <n-button
+              type="info"
+              size="small"
+              :disabled="saving === inq.id"
+              @click="save(inq)"
+            >
+              {{ saving === inq.id ? '저장 중...' : '저장' }}
+            </n-button>
           </div>
         </div>
       </div>
@@ -80,6 +151,14 @@ function toggle(id: number) {
   font-size: 18px;
   font-weight: 500;
   margin-bottom: 20px;
+}
+
+.loading-notice,
+.empty-notice {
+  font-size: 13px;
+  color: #aaa;
+  padding: 24px 0;
+  text-align: center;
 }
 
 .inquiry-list {

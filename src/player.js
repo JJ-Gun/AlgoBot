@@ -10,6 +10,7 @@ import { Readable } from 'stream';
 import { audioPlayers, queueMode, ttsQueues, VOICES } from './config.js';
 import { generateTTS } from './tts.js';
 import db from '../server/db/index.js';
+import { logError } from '../server/db/logger.js';
 
 const generateChains = new Map();
 
@@ -27,16 +28,7 @@ function logTTS(guildId, userId, voiceKey) {
       VALUES (?, ?, ?, ?)
     `).run(guildId, userId, voiceKey, engine);
   } catch (err) {
-    console.error('TTS 로그 기록 실패:', err);
-  }
-}
-
-function logError(message) {
-  console.error(message);
-  try {
-    db.prepare('INSERT INTO error_logs (level, message) VALUES (?, ?)').run('ERROR', message);
-  } catch (err) {
-    console.error('에러 로그 기록 실패:', err);
+    logError(`TTS 로그 기록 실패: ${err.message}`);
   }
 }
 
@@ -69,16 +61,21 @@ export async function playTTS(text, voiceKey, guildId, voiceChannel, interaction
   let connection = getVoiceConnection(guildId);
 
   if (!connection) {
-    connection = joinVoiceChannel({
-      channelId: voiceChannel.id,
-      guildId,
-      adapterCreator: voiceChannel.guild.voiceAdapterCreator,
-    });
-    const player = createAudioPlayer();
-    audioPlayers.set(guildId, player);
-    ttsQueues.set(guildId, []);
-    generateChains.set(guildId, Promise.resolve());
-    connection.subscribe(player);
+    try {
+      connection = joinVoiceChannel({
+        channelId: voiceChannel.id,
+        guildId,
+        adapterCreator: voiceChannel.guild.voiceAdapterCreator,
+      });
+      const player = createAudioPlayer();
+      audioPlayers.set(guildId, player);
+      ttsQueues.set(guildId, []);
+      generateChains.set(guildId, Promise.resolve());
+      connection.subscribe(player);
+    } catch (err) {
+      logError(`음성 채널 연결 실패 · guild: ${guildId} · ${err.message}`);
+      throw err;
+    }
   } else {
     const currentChannelId = connection.joinConfig.channelId;
     if (currentChannelId !== voiceChannel.id) {

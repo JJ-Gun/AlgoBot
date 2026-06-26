@@ -1,5 +1,5 @@
 import { execSync } from 'child_process'
-import db from './index.js'
+import { logError, logWarn } from './logger.js'
 
 const CHECK_INTERVAL = 10_000 // 10초
 
@@ -27,15 +27,10 @@ function logStatusChange(name, prevStatus, newStatus) {
   if (prevStatus === newStatus) return
   if (prevStatus === 'unknown') return // 최초 체크는 로그 남기지 않음
 
-  const level = newStatus === 'ok' ? 'WARN' : 'ERROR'
-  const message = newStatus === 'ok'
-    ? `${name} 서비스가 정상으로 복구되었습니다.`
-    : `${name} 서비스에 연결할 수 없습니다.`
-
-  try {
-    db.prepare('INSERT INTO error_logs (level, message) VALUES (?, ?)').run(level, message)
-  } catch (err) {
-    console.error('상태 변경 로그 기록 실패:', err)
+  if (newStatus === 'ok') {
+    logWarn(`${name} 서비스가 정상으로 복구되었습니다.`)
+  } else {
+    logError(`${name} 서비스에 연결할 수 없습니다.`)
   }
 }
 
@@ -83,7 +78,8 @@ function getResources() {
     const cpuUsed = (100 - cpuIdle).toFixed(1)
 
     return { total, used, swapTotal, swapUsed, cpuUsed }
-  } catch {
+  } catch (err) {
+    logError(`리소스 정보 조회 실패: ${err.message}`)
     return null
   }
 }

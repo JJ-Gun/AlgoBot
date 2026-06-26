@@ -29,6 +29,7 @@ function logout() {
         <RouterLink to="/notice">공지사항</RouterLink>
         <RouterLink to="/voice">목소리 · 설정</RouterLink>
         <RouterLink to="/inquiry">문의</RouterLink>
+        <RouterLink v-if="userStore.isAdmin" to="/admin" class="admin-link">관리자</RouterLink>
       </nav>
       <div class="side right">
         <div class="auth">
@@ -103,6 +104,10 @@ function logout() {
   font-weight: 500;
   color: #333;
   background: #f5f5f5;
+}
+
+.admin-link {
+  color: #378add !important;
 }
 
 .auth {
