@@ -14,6 +14,10 @@ import adminNoticeRouter from './routes/admin/notice.js'
 import adminInquiryRouter from './routes/admin/inquiry.js'
 import { startHealthMonitor } from './db/healthMonitor.js'
 
+
+import { join, dirname } from 'path'
+import { fileURLToPath } from 'url'
+
 dotenv.config()
 
 const app = express()
@@ -21,6 +25,9 @@ const PORT = process.env.SERVER_PORT || 3000
 
 app.use(cors({ origin: process.env.WEB_URL }))
 app.use(express.json())
+
+const __dirname = dirname(fileURLToPath(import.meta.url))
+app.use('/samples', express.static(join(__dirname, 'public/samples')))
 
 app.use('/auth', authRouter)
 app.use('/user', userRouter)

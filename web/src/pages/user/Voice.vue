@@ -21,6 +21,8 @@ const currentVoiceKey = ref<string | null>(null)
 const currentSpeed = ref(10)
 const loading = ref(true)
 const saving = ref<string | null>(null)
+const playingSample = ref<string | null>(null)
+let currentAudio: HTMLAudioElement | null = null
 
 const filters = ref<string[]>(['전체'])
 const activeFilter = ref('전체')
@@ -156,6 +158,34 @@ async function apply(key: string) {
 function getSpeedLabel(val: number) {
   return (val / 10).toFixed(1) + 'x'
 }
+
+function previewVoice(key: string) {
+  const voice = voices.value.find(v => v.key === key)
+
+  if (playingSample.value === key) {
+    currentAudio?.pause()
+    currentAudio = null
+    playingSample.value = null
+    return
+  }
+  if (currentAudio) {
+    currentAudio.pause()
+    currentAudio = null
+  }
+  playingSample.value = key
+  const audio = new Audio(`${import.meta.env.VITE_API_URL}/samples/${key}.wav`)
+  currentAudio = audio
+  audio.playbackRate = voice ? voice.draftSpeed / 10 : 1.0
+  audio.play()
+  audio.onended = () => {
+    playingSample.value = null
+    currentAudio = null
+  }
+  audio.onerror = () => {
+    playingSample.value = null
+    currentAudio = null
+  }
+}
 </script>
 
 <template>
@@ -208,7 +238,9 @@ function getSpeedLabel(val: number) {
               <div class="voice-meta">{{ voice.lang }} · {{ engineLabel[voice.engine] }}</div>
             </div>
             <div class="voice-actions" @click.stop>
-              <n-button size="small">미리듣기</n-button>
+              <n-button size="small" @click.stop="previewVoice(voice.key)">
+                {{ playingSample === voice.key ? '정지' : '미리듣기' }}
+              </n-button>
               <n-button
                 size="small"
                 type="info"
