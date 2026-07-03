@@ -1,5 +1,5 @@
 import { Events } from 'discord.js';
-import { ttsChanels, userVoices, DEFAULT_VOICE } from '../config.js';
+import { ttsChanels, DEFAULT_VOICE, getUserVoice } from '../config.js';
 import { playTTS } from '../player.js';
 import { logError } from '../../server/db/logger.js';
 
@@ -28,7 +28,7 @@ export function registerMessageHandler(client) {
     const voiceChannel = message.member?.voice.channel;
     if (!voiceChannel) return;
 
-    const voiceKey = userVoices.get(message.author.id) || DEFAULT_VOICE;
+    const voiceKey = getUserVoice(message.author.id);
     try {
       await playTTS(message.content, voiceKey, message.guild.id, voiceChannel, null, message.author.id);
     } catch (err) {

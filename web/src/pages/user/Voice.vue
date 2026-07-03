@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useUserStore } from '@/stores/user'
 
 interface VoiceOption {
@@ -69,10 +69,30 @@ async function loadMySettings() {
   }
 }
 
+async function refreshMySettings() {
+  if (!userStore.token) return
+  try {
+    const res = await fetch(`${import.meta.env.VITE_API_URL}/user/settings`, {
+      headers: { Authorization: `Bearer ${userStore.token}` }
+    })
+    if (!res.ok) return
+    const data = await res.json()
+    currentVoiceKey.value = data.voice_key
+    currentSpeed.value = Math.round(data.speed * 10)
+  } catch {}
+}
+
+const onFocus = () => refreshMySettings()
+
 onMounted(async () => {
   await loadVoices()
   await loadMySettings()
   loading.value = false
+  window.addEventListener('focus', onFocus)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('focus', onFocus)
 })
 
 function toggleExpand(key: string) {

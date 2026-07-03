@@ -1,4 +1,5 @@
 import { existsSync, readFileSync, writeFileSync } from 'fs';
+import db from '../server/db/index.js';
 
 export const DEFAULT_VOICE = 'ko-SunHi';
 
@@ -27,20 +28,36 @@ export const VOICES = {
 export const SETTINGS_FILE = './settings.json';
 export const settings = existsSync(SETTINGS_FILE)
   ? JSON.parse(readFileSync(SETTINGS_FILE, 'utf-8')) 
-  : { ttsChannels: {}, userVoices: {}, queueMode: {} };
+  : { ttsChannels: {}, queueMode: {} };
 
-if(!settings.userVoices) settings.userVoices = {};
 if(!settings.queueMode) settings.queueMode = {};
 
 export const ttsChanels = new Map(Object.entries(settings.ttsChannels));
 export const currentFiles = new Map();
 export const audioPlayers = new Map();
-export const userVoices = new Map(Object.entries(settings.userVoices));
 export const queueMode = new Map(Object.entries(settings.queueMode).map(([k, v]) => [k, Boolean(v)]));
 export const ttsQueues = new Map();
 
 export function saveSettings() {
-  settings.userVoices = Object.fromEntries(userVoices);
   settings.queueMode = Object.fromEntries(queueMode);
   writeFileSync(SETTINGS_FILE, JSON.stringify(settings, null, 2));
+}
+
+// --- 목소리 설정: SQLite (users 테이블) 기반 ---
+
+export function getUserVoice(userId) {
+  const row = db.prepare('SELECT voice_key FROM users WHERE id = ?').get(userId);
+  return row?.voice_key || DEFAULT_VOICE;
+}
+
+export function setUserVoice(userId, voiceKey, username = null) {
+  const existing = db.prepare('SELECT id FROM users WHERE id = ?').get(userId);
+  if (existing) {
+    db.prepare('UPDATE users SET voice_key = ? WHERE id = ?').run(voiceKey, userId);
+  } else {
+    db.prepare(`
+      INSERT INTO users (id, username, voice_key)
+      VALUES (?, ?, ?)
+    `).run(userId, username ?? userId, voiceKey);
+  }
 }

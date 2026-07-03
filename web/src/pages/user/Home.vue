@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 
@@ -85,7 +85,28 @@ async function loadAll() {
   }
 }
 
-onMounted(loadAll)
+async function refreshMySettings() {
+  if (!userStore.token) return
+  try {
+    const settingsRes = await fetch(`${import.meta.env.VITE_API_URL}/user/settings`, {
+      headers: { Authorization: `Bearer ${userStore.token}` }
+    })
+    if (!settingsRes.ok) return
+    mySettings.value = await settingsRes.json()
+    myVoice.value = voices.value.find(v => v.key === mySettings.value?.voice_key) ?? null
+  } catch {}
+}
+
+const onFocus = () => refreshMySettings()
+
+onMounted(async () => {
+  await loadAll()
+  window.addEventListener('focus', onFocus)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('focus', onFocus)
+})
 </script>
 
 <template>

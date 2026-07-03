@@ -1,14 +1,50 @@
-import { Events } from 'discord.js';
+import { Events, ActionRowBuilder, StringSelectMenuBuilder, EmbedBuilder } from 'discord.js';
 import { getVoiceConnection, joinVoiceChannel, createAudioPlayer } from '@discordjs/voice';
-import { VOICES, DEFAULT_VOICE, userVoices, audioPlayers, ttsChanels, settings, saveSettings, queueMode } from '../config.js';
+import { VOICES, DEFAULT_VOICE, audioPlayers, ttsChanels, settings, saveSettings, queueMode, getUserVoice, setUserVoice } from '../config.js';
 import { playTTS, skipTTS } from '../player.js';
 import { logError } from '../../server/db/logger.js';
 
+const WEB_URL = process.env.WEB_URL
+
 export function registerInteractionHandler(client) {
   client.on(Events.InteractionCreate, async (interaction) => {
-    if (!interaction.isChatInputCommand()) return;
-
     const { commandName } = interaction;
+
+    // Select Menu 선택 처리
+    if (interaction.isStringSelectMenu() && interaction.customId === 'voice_select') {
+      const voiceKey = interaction.values[0]
+      const voice = VOICES[voiceKey]
+      if (!voice) return interaction.update({ content: '알 수 없는 목소리입니다.', components: [] })
+
+      try {
+        setUserVoice(interaction.user.id, voiceKey, interaction.user.username)
+
+        const selectMenu = new StringSelectMenuBuilder()
+          .setCustomId('voice_select')
+          .setPlaceholder('목소리를 선택하세요')
+          .addOptions(
+            Object.entries(VOICES).map(([key, val]) => ({
+              label: val.displayName,
+              description: val.lang,
+              value: key,
+              default: key === voiceKey,
+            }))
+          )
+
+        const row = new ActionRowBuilder().addComponents(selectMenu)
+
+        await interaction.update({
+          content: `목소리를 **${voice.displayName}** 로 변경했어요!\n\n더 많은 설정은 [웹페이지](${WEB_URL})에서 할 수 있어요.`,
+          components: [row],
+        })
+      } catch (err) {
+        logError(`목소리 변경 실패 · user: ${interaction.user.id} · ${err.message}`)
+        await interaction.update({ content: '목소리 변경 중 오류가 발생했습니다.', components: [] })
+      }
+      return
+    }
+
+    if (!interaction.isChatInputCommand()) return;
 
     try {
       if (commandName === '입장') {
@@ -72,22 +108,37 @@ export function registerInteractionHandler(client) {
       }
 
       if (commandName === '목소리') {
-        const voiceKey = interaction.options.getString('선택');
-        if (!voiceKey) {
-          const current = userVoices.get(interaction.user.id) || DEFAULT_VOICE;
-          const list = Object.entries(VOICES)
-            .map(([key, val]) => `\`${key}\` - ${val.lang}`)
-            .join('\n');
-          return interaction.reply({ content: `**사용 가능한 목소리:**\n${list}\n\n**현재 내 목소리:** \`${current}\``, flags: 64 });
-        }
-        userVoices.set(interaction.user.id, voiceKey);
-        saveSettings();
-        return interaction.reply({ content: `목소리를 \`${voiceKey}\` 로 변경했어요!`, flags: 64 });
+        const currentVoiceKey = getUserVoice(interaction.user.id)
+        const currentVoice = VOICES[currentVoiceKey]
+
+        const selectMenu = new StringSelectMenuBuilder()
+          .setCustomId('voice_select')
+          .setPlaceholder('목소리를 선택하세요')
+          .addOptions(
+            Object.entries(VOICES).map(([key, val]) => ({
+              label: val.displayName,
+              description: val.lang,
+              value: key,
+              default: key === currentVoiceKey,
+            }))
+          )
+
+        const row = new ActionRowBuilder().addComponents(selectMenu)
+
+        return interaction.reply({
+          content: `현재 목소리: **${currentVoice?.displayName ?? currentVoiceKey}**\n목소리를 선택해주세요.`,
+          components: [row],
+          flags: 64,
+        })
       }
 
       if (commandName === '내목소리') {
-        const current = userVoices.get(interaction.user.id) || DEFAULT_VOICE;
-        return interaction.reply({ content: `**현재 내 목소리:** \`${current}\``, flags: 64 });
+        const voiceKey = getUserVoice(interaction.user.id)
+        const voice = VOICES[voiceKey]
+        return interaction.reply({
+          content: `현재 내 목소리: **${voice?.displayName ?? voiceKey}**\n\n더 많은 설정은 [웹페이지](${WEB_URL})에서 할 수 있어요.`,
+          flags: 64,
+        });
       }
 
       if (commandName === 'tts') {
@@ -96,7 +147,7 @@ export function registerInteractionHandler(client) {
         if (!voiceChannel) return interaction.reply({ content: '먼저 음성 채널에 들어가세요!', flags: 64 });
 
         await interaction.deferReply({ flags: 64 });
-        const voiceKey = userVoices.get(interaction.user.id) || DEFAULT_VOICE;
+        const voiceKey = getUserVoice(interaction.user.id)
         try {
           await playTTS(text, voiceKey, interaction.guild.id, voiceChannel, interaction, interaction.user.id);
           await interaction.editReply({ content: '재생 중!' });

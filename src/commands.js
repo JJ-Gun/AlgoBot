@@ -1,5 +1,4 @@
 import { SlashCommandBuilder, REST, Routes } from 'discord.js';
-import { VOICES } from './config.js';
 
 export const commands = [
   new SlashCommandBuilder()
@@ -13,15 +12,7 @@ export const commands = [
     .setDescription('현재 채널을 TTS 채널로 설정하거나 해제합니다'),
   new SlashCommandBuilder()
     .setName('목소리')
-    .setDescription('목소리를 변경합니다')
-    .addStringOption(option =>
-      option.setName('선택')
-        .setDescription('변경할 목소리 이름')
-        .setRequired(true)
-        .addChoices(
-          ...Object.entries(VOICES).map(([key, val]) => ({ name: val.displayName, value: key }))
-        )
-    ),
+    .setDescription('목소리를 변경합니다'),
   new SlashCommandBuilder()
     .setName('내목소리')
     .setDescription('현재 내 목소리를 확인합니다'),
