@@ -183,7 +183,9 @@ deactivate
 pm2 start melo_server.py --name melo --interpreter ./melo-venv/bin/python3
 pm2 start kokoro_server.py --name kokoro --interpreter ./kokoro-venv/bin/python3
 pm2 start index.js --name bot
+pm2 start server/index.js --name server
 pm2 save
+pm2 startup  # EC2 재부팅 시 자동 시작 설정
 ```
 
 ### 개별 실행 (개발 환경)
@@ -197,6 +199,12 @@ source kokoro-venv/bin/activate && python3 kokoro_server.py
 
 # 터미널 3
 node index.js
+
+# 터미널 4
+npm run dev:server
+
+# 터미널 5 (프론트엔드)
+cd web && npm run dev
 ```
 
 ### 목소리 샘플 오디오 생성
@@ -207,6 +215,32 @@ node index.js
 node generateSamples.js [voice_key]
 # 예시: node generateSamples.js ko-SunHi
 ```
+
+---
+
+## 배포 (EC2 + nginx)
+
+### 도메인 및 HTTPS
+- **도메인**: algottsbot.com (AWS Route 53)
+- **SSL**: Let's Encrypt (Certbot, 90일마다 자동 갱신)
+- **웹 서버**: nginx (80 → HTTPS 리다이렉트, 443에서 프론트/백엔드 라우팅)
+
+### nginx 설정
+- `/auth/discord`, `/auth/me`, `/user/`, `/notices`, `/inquiries`, `/admin/`, `/samples/` → Express(3000) 프록시
+- 그 외 모든 경로 → Vue 빌드 결과물 (`web/dist`) 정적 서빙
+
+### 프론트엔드 빌드
+```bash
+cd web
+npm run build
+```
+
+### AWS 보안 그룹 인바운드 규칙
+| 포트 | 용도 |
+|------|------|
+| 22 | SSH |
+| 80 | HTTP (HTTPS 리다이렉트) |
+| 443 | HTTPS |
 
 ---
 
@@ -293,6 +327,24 @@ WEB_URL=http://EC2_IP:5173
 ---
 
 ## 업데이트 로그
+
+<details>
+<summary><strong>2026-07-08</strong> — 운영 환경 구축, 보안 강화</summary>
+
+* 도메인이 연결되었습니다.
+  * algottsbot.com 도메인으로 접속할 수 있습니다.
+* HTTPS가 적용되었습니다.
+  * Let's Encrypt SSL 인증서가 적용되어 안전하게 접속할 수 있습니다.
+  * 인증서는 자동으로 갱신됩니다.
+* 보안이 강화되었습니다.
+  * 불필요한 포트(3000, 5173)가 차단되었습니다.
+  * 외부에서는 80(HTTP), 443(HTTPS) 포트로만 접근 가능합니다.
+  * HTTP로 접속하면 자동으로 HTTPS로 리다이렉트됩니다.
+* 서버 안정성이 개선되었습니다.
+  * pm2로 모든 프로세스를 관리합니다.
+  * 서버가 재부팅되면 모든 프로세스가 자동으로 다시 시작됩니다.
+
+</details>
 
 <details>
 <summary><strong>2026-07-03</strong> — 목소리 설정 통합, 디스코드 목소리 선택 UI 개선, 미리듣기 기능 추가</summary>
