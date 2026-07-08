@@ -8,4 +8,6 @@ melo-venv/
 kokoro-venv/
 __pycache__/
 **/.DS_Store
-!server/public/samples/*.wav
+server/db/*.db
+server/db/*.db-shm
+server/db/*.db-wal
