@@ -300,29 +300,22 @@ npm run dev -- --host
 
 ### 환경 변수 (.env, 기존 항목에 추가)
 
-```
-NODE_ENV=production
+| 변수 | 설명 |
+|------|------|
+| `NODE_ENV` | 실행 환경. `production` 또는 `development` |
+| `DISCORD_CLIENT_ID` | Discord Developer Portal에서 발급한 운영용 앱의 Client ID |
+| `DISCORD_CLIENT_SECRET` | 운영용 앱의 Client Secret |
+| `DISCORD_REDIRECT_URI` | 운영 환경의 OAuth 콜백 주소 (예: `https://도메인/auth/discord/callback`) |
+| `DEV_DISCORD_CLIENT_ID` | 개발용 앱의 Client ID |
+| `DEV_DISCORD_CLIENT_SECRET` | 개발용 앱의 Client Secret |
+| `DEV_DISCORD_REDIRECT_URI` | 개발 환경의 OAuth 콜백 주소 (예: `http://localhost:3000/auth/discord/callback`) |
+| `ADMIN_DISCORD_ID` | 관리자 권한을 부여할 Discord 계정 ID |
+| `JWT_SECRET` | JWT 토큰 서명에 사용할 랜덤 문자열 |
+| `SERVER_PORT` | Express 서버 포트 (기본값: `3000`) |
+| `WEB_URL` | 프론트엔드 주소. CORS 허용 및 OAuth 콜백 리다이렉트에 사용 |
+| `BOT_HEALTH_PORT` | 봇 헬스체크 서버 포트 (기본값: `3001`) |
 
-# Discord OAuth 운영용
-DISCORD_CLIENT_ID=
-DISCORD_CLIENT_SECRET=
-DISCORD_REDIRECT_URI=http://EC2_IP:3000/auth/discord/callback
-
-# Discord OAuth 개발용
-DEV_DISCORD_CLIENT_ID=
-DEV_DISCORD_CLIENT_SECRET=
-DEV_DISCORD_REDIRECT_URI=http://localhost:3000/auth/discord/callback
-
-# 공통
-ADMIN_DISCORD_ID=
-JWT_SECRET=
-
-# Server
-SERVER_PORT=3000
-WEB_URL=http://EC2_IP:5173
-```
-
-`web/.env`에는 `VITE_API_URL`로 백엔드 주소를 지정합니다.
+`web/.env`에는 `VITE_API_URL`로 백엔드 주소를 지정합니다. (예: `https://도메인`)
 
 ---
 
