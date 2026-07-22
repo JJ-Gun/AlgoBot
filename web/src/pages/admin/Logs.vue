@@ -22,7 +22,7 @@ function formatTime(dateStr: string) {
 async function loadLogs() {
   try {
     const res = await fetch(`${import.meta.env.VITE_API_URL}/admin/logs`, {
-      headers: { Authorization: `Bearer ${userStore.token}` }
+      credentials: 'include'
     })
     if (!res.ok) throw new Error('로그 조회 실패')
     logs.value = await res.json()

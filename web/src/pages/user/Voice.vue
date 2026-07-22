@@ -54,10 +54,10 @@ async function loadVoices() {
 }
 
 async function loadMySettings() {
-  if (!userStore.token) return
+  if (!userStore.isLoggedIn) return
   try {
     const res = await fetch(`${import.meta.env.VITE_API_URL}/user/settings`, {
-      headers: { Authorization: `Bearer ${userStore.token}` }
+      credentials: 'include'
     })
     if (!res.ok) return
     const data = await res.json()
@@ -72,10 +72,10 @@ async function loadMySettings() {
 }
 
 async function refreshMySettings() {
-  if (!userStore.token) return
+  if (!userStore.isLoggedIn) return
   try {
     const res = await fetch(`${import.meta.env.VITE_API_URL}/user/settings`, {
-      headers: { Authorization: `Bearer ${userStore.token}` }
+      credentials: 'include'
     })
     if (!res.ok) return
     const data = await res.json()
@@ -130,7 +130,7 @@ function onSliderInput(key: string) {
 }
 
 async function apply(key: string) {
-  if (!userStore.token) return
+  if (!userStore.isLoggedIn) return
   const voice = voices.value.find(v => v.key === key)
   if (!voice) return
 
@@ -140,8 +140,8 @@ async function apply(key: string) {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${userStore.token}`,
       },
+      credentials: 'include',
       body: JSON.stringify({ voice_key: key, speed: voice.draftSpeed / 10 }),
     })
     if (!res.ok) throw new Error('적용 실패')

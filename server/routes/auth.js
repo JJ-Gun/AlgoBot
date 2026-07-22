@@ -61,7 +61,13 @@ router.get('/discord/callback', async (req, res) => {
 
     const token = jwt.sign({ id, username, avatar, is_admin }, process.env.JWT_SECRET, { expiresIn: '7d' })
 
-    res.redirect(`${process.env.WEB_URL}/auth/callback?token=${token}`)
+    res.cookie(`token`, token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV !== 'development',
+      sameSite: 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    })
+    res.redirect(`${process.env.WEB_URL}/auth/callback`)
   } catch (err) {
     const detail = err.response?.data ? JSON.stringify(err.response.data) : err.message
     logError(`Discord OAuth 로그인 실패: ${detail}`)
@@ -70,21 +76,24 @@ router.get('/discord/callback', async (req, res) => {
 })
 
 router.get('/me', (req, res) => {
-  const token = req.headers.authorization?.split(' ')[1]
+  const token = req.cookies?.token
   if (!token) return res.status(401).json({ error: '인증이 필요합니다.' })
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET)
     const user = db.prepare('SELECT * FROM users WHERE id = ?').get(decoded.id)
     if (!user) {
-      logError(`/auth/me: 존재하지 않는 유저 조회 시도 (id: ${decoded.id})`, 'WARN')
       return res.status(404).json({ error: '유저를 찾을 수 없습니다.' })
     }
     res.json(user)
   } catch (err) {
-    logError(`/auth/me: 유효하지 않은 토큰 - ${err.message}`, 'WARN')
     res.status(401).json({ error: '유효하지 않은 토큰입니다.' })
   }
+})
+
+router.post('/logout', (req, res) => {
+  res.clearCookie('token')
+  res.json({ success: true })
 })
 
 export default router

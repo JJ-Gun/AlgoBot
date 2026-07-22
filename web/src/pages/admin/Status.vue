@@ -33,7 +33,7 @@ const statusLabel: Record<string, { label: string; color: string }> = {
 async function loadStatus() {
   try {
     const res = await fetch(`${import.meta.env.VITE_API_URL}/admin/status`, {
-      headers: { Authorization: `Bearer ${userStore.token}` }
+      credentials: 'include'
     })
     if (!res.ok) throw new Error('상태 조회 실패')
     state.value = await res.json()

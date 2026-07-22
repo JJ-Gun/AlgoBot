@@ -13,6 +13,7 @@ import adminLogsRouter from './routes/admin/logs.js'
 import adminNoticeRouter from './routes/admin/notice.js'
 import adminInquiryRouter from './routes/admin/inquiry.js'
 import { startHealthMonitor } from './db/healthMonitor.js'
+import cookieParser from 'cookie-parser'
 
 
 import { join, dirname } from 'path'
@@ -23,8 +24,9 @@ dotenv.config()
 const app = express()
 const PORT = process.env.SERVER_PORT || 3000
 
-app.use(cors({ origin: process.env.WEB_URL }))
+app.use(cors({ origin: process.env.WEB_URL, credentials: true }))
 app.use(express.json())
+app.use(cookieParser())
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 app.use('/samples', express.static(join(__dirname, 'public/samples')))

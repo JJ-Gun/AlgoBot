@@ -69,9 +69,9 @@ async function loadAll() {
     inquiries.value = (await inquiryRes.json()).slice(0, 3)
     voices.value = await voiceRes.json()
 
-    if (userStore.token) {
+    if (userStore.isLoggedIn) {
       const settingsRes = await fetch(`${import.meta.env.VITE_API_URL}/user/settings`, {
-        headers: { Authorization: `Bearer ${userStore.token}` }
+        credentials: 'include'
       })
       if (settingsRes.ok) {
         mySettings.value = await settingsRes.json()
@@ -86,10 +86,10 @@ async function loadAll() {
 }
 
 async function refreshMySettings() {
-  if (!userStore.token) return
+  if (!userStore.isLoggedIn) return
   try {
     const settingsRes = await fetch(`${import.meta.env.VITE_API_URL}/user/settings`, {
-      headers: { Authorization: `Bearer ${userStore.token}` }
+      credentials: 'include'
     })
     if (!settingsRes.ok) return
     mySettings.value = await settingsRes.json()

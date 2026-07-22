@@ -30,7 +30,7 @@ async function loadStats() {
   try {
     const params = filter.value !== '전체' ? `?filter=${filter.value}` : ''
     const res = await fetch(`${import.meta.env.VITE_API_URL}/admin/stats${params}`, {
-      headers: { Authorization: `Bearer ${userStore.token}` }
+      credentials: 'include'
     })
     if (!res.ok) throw new Error('통계 로딩 실패')
     const data = await res.json()

@@ -26,7 +26,7 @@ function formatDate(dateStr: string) {
 async function loadNotices() {
   try {
     const res = await fetch(`${import.meta.env.VITE_API_URL}/admin/notices`, {
-      headers: { Authorization: `Bearer ${userStore.token}` }
+      credentials: 'include'
     })
     if (!res.ok) throw new Error('공지 목록 조회 실패')
     notices.value = await res.json()
@@ -63,8 +63,8 @@ async function submit() {
       method,
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${userStore.token}`,
       },
+      credentials: 'include',
       body: JSON.stringify({ title: editTarget.value.title, content: editTarget.value.content }),
     })
     if (!res.ok) throw new Error('저장 실패')
@@ -83,7 +83,7 @@ async function deleteNotice(id: number) {
   try {
     const res = await fetch(`${import.meta.env.VITE_API_URL}/admin/notices/${id}`, {
       method: 'DELETE',
-      headers: { Authorization: `Bearer ${userStore.token}` },
+      credentials: 'include'
     })
     if (!res.ok) throw new Error('삭제 실패')
     await loadNotices()

@@ -43,7 +43,7 @@ function formatDate(dateStr: string) {
 async function loadInquiries() {
   try {
     const res = await fetch(`${import.meta.env.VITE_API_URL}/admin/inquiries`, {
-      headers: { Authorization: `Bearer ${userStore.token}` }
+      credentials: 'include'
     })
     if (!res.ok) throw new Error('문의 목록 조회 실패')
     inquiries.value = await res.json()
@@ -63,8 +63,8 @@ async function save(inq: Inquiry) {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${userStore.token}`,
       },
+      credentials: 'include',
       body: JSON.stringify({
         reply: draftReply.value[inq.id],
         status: draftStatus.value[inq.id],

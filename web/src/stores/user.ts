@@ -10,17 +10,15 @@ interface User {
 
 export const useUserStore = defineStore('user', () => {
   const user = ref<User | null>(null)
-  const token = ref<string | null>(localStorage.getItem('token'))
-
   const isLoggedIn = computed(() => user.value !== null)
   const isAdmin = computed(() => user.value?.isAdmin ?? false)
 
   async function fetchUser() {
-    if (!token.value) return
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/auth/me`, {
-        headers: { Authorization: `Bearer ${token.value}` }
-      })
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/auth/me`,
+        {
+          credentials: 'include'
+        })
       if (!res.ok) throw new Error('인증 실패')
       const data = await res.json()
       user.value = {
@@ -29,22 +27,22 @@ export const useUserStore = defineStore('user', () => {
         avatar: data.avatar,
         isAdmin: Boolean(data.is_admin),
       }
-    } catch {
-      clearUser()
+    }catch {
+      user.value = null
     }
   }
 
-  function setUser(newUser: User, newToken: string) {
+  function setUser(newUser: User) {
     user.value = newUser
-    token.value = newToken
-    localStorage.setItem('token', newToken)
   }
 
-  function clearUser() {
+  async function clearUser() {
     user.value = null
-    token.value = null
-    localStorage.removeItem('token')
+    await fetch(`${import.meta.env.VITE_API_URL}/auth/logout`,
+      {
+        method: 'POST', credentials: 'include'
+      }).catch(() => {})
   }
 
-  return { user, token, isLoggedIn, isAdmin, setUser, clearUser, fetchUser }
+  return { user, isLoggedIn, isAdmin, setUser, clearUser, fetchUser }
 })

@@ -79,8 +79,8 @@ async function submit() {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${userStore.token}`,
       },
+      credentials: 'include',
       body: JSON.stringify(form.value),
     })
     if (!res.ok) throw new Error('제출 실패')
