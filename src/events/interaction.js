@@ -38,7 +38,7 @@ export function registerInteractionHandler(client) {
           components: [row],
         })
       } catch (err) {
-        logError(`목소리 변경 실패 · user: ${interaction.user.id} · ${err.message}`)
+        logError(`목소리 변경 실패 · user: ${interaction.user.id} · ${err.message}`, 'ERROR', err.stack)
         await interaction.update({ content: '목소리 변경 중 오류가 발생했습니다.', components: [] })
       }
       return
@@ -152,7 +152,7 @@ export function registerInteractionHandler(client) {
           await playTTS(text, voiceKey, interaction.guild.id, voiceChannel, interaction, interaction.user.id);
           await interaction.editReply({ content: '재생 중!' });
         } catch (err) {
-          logError(`/tts 명령어 처리 실패 · guild: ${interaction.guild.id} · ${err.message}`);
+          logError(`/tts 명령어 처리 실패 · guild: ${interaction.guild.id} · ${err.message}`, 'ERROR', err.stack);
           await interaction.editReply({ content: 'TTS 생성 중 오류가 발생했습니다.' });
         }
         return;
@@ -170,7 +170,7 @@ export function registerInteractionHandler(client) {
         return interaction.reply({ content: success ? '건너뜁니다!' : '재생 중인 문장이 없어요.', flags: 64 });
       }
     } catch (err) {
-      logError(`'/${commandName}' 명령어 처리 중 예외 · guild: ${interaction.guild?.id} · ${err.message}`);
+      logError(`'/${commandName}' 명령어 처리 중 예외 · guild: ${interaction.guild?.id} · ${err.message}`, 'ERROR', err.stack);
       if (interaction.deferred || interaction.replied) {
         await interaction.editReply({ content: '명령어 처리 중 오류가 발생했습니다.' }).catch(() => {});
       } else {

@@ -70,7 +70,7 @@ router.get('/discord/callback', async (req, res) => {
     res.redirect(`${process.env.WEB_URL}/auth/callback`)
   } catch (err) {
     const detail = err.response?.data ? JSON.stringify(err.response.data) : err.message
-    logError(`Discord OAuth 로그인 실패: ${detail}`)
+    logError(`Discord OAuth 로그인 실패: ${detail}`, 'ERROR', err.stack)
     res.status(500).json({ error: 'OAuth 처리 중 오류가 발생했습니다.' })
   }
 })
@@ -89,7 +89,7 @@ router.get('/me', (req, res) => {
     res.json(user)
   } catch (err) {
     if (err.name !== 'TokenExpiredError') {
-      logError(`/auth/me: 유효하지 않은 토큰 - ${err.message}`, 'WARN')
+      logError(`/auth/me: 유효하지 않은 토큰 - ${err.message}`, 'WARN', err.stack)
     }
     res.status(200).json(null)
   }

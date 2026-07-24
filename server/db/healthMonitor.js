@@ -79,7 +79,7 @@ function getResources() {
 
     return { total, used, swapTotal, swapUsed, cpuUsed }
   } catch (err) {
-    logError(`리소스 정보 조회 실패: ${err.message}`)
+    logError(`리소스 정보 조회 실패: ${err.message}`, 'ERROR', err.stack)
     return null
   }
 }

@@ -9,7 +9,7 @@ export function authMiddleware(req, res, next) {
     next()
   } catch (err) {
     if (err.name !== 'TokenExpiredError') {
-      logError(`인증 실패 - 유효하지 않은 토큰: ${err.message} (경로: ${req.originalUrl})`, 'WARN')
+      logError(`인증 실패 - 유효하지 않은 토큰: ${err.message} (경로: ${req.originalUrl})`, 'WARN', err.stack)
     }
     return res.status(401).json({ error: '유효하지 않은 토큰입니다.' })
   }

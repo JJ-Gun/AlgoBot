@@ -28,7 +28,7 @@ function logTTS(guildId, userId, voiceKey) {
       VALUES (?, ?, ?, ?)
     `).run(guildId, userId, voiceKey, engine);
   } catch (err) {
-    logError(`TTS 로그 기록 실패: ${err.message}`);
+    logError(`TTS 로그 기록 실패: ${err.message}`, 'ERROR', err.stack);
   }
 }
 
@@ -73,7 +73,7 @@ export async function playTTS(text, voiceKey, guildId, voiceChannel, interaction
       generateChains.set(guildId, Promise.resolve());
       connection.subscribe(player);
     } catch (err) {
-      logError(`음성 채널 연결 실패 · guild: ${guildId} · ${err.message}`);
+      logError(`음성 채널 연결 실패 · guild: ${guildId} · ${err.message}`, 'ERROR', err.stack);
       throw err;
     }
   } else {
@@ -100,7 +100,7 @@ export async function playTTS(text, voiceKey, guildId, voiceChannel, interaction
         audio = await generateTTS(text, voiceKey);
         console.log(`[TTS] generated ${(performance.now() - t0).toFixed(0)}ms`);
       } catch (err) {
-        logError(`TTS 생성 실패 (${voiceKey}) · guild: ${guildId} · ${err.message}`);
+        logError(`TTS 생성 실패 (${voiceKey}) · guild: ${guildId} · ${err.message}`, 'ERROR', err.stack);
         return;
       }
       logTTS(guildId, userId, voiceKey);
@@ -116,7 +116,7 @@ export async function playTTS(text, voiceKey, guildId, voiceChannel, interaction
       audio = await generateTTS(text, voiceKey);
       console.log(`[TTS] generated ${(performance.now() - t0).toFixed(0)}ms`);
     } catch (err) {
-      logError(`TTS 생성 실패 (${voiceKey}) · guild: ${guildId} · ${err.message}`);
+      logError(`TTS 생성 실패 (${voiceKey}) · guild: ${guildId} · ${err.message}`, 'ERROR', err.stack);
       throw err;
     }
     logTTS(guildId, userId, voiceKey);
