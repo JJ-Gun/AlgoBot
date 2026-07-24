@@ -27,6 +27,7 @@
     "dotenv": "^17.4.2",
     "edge-tts-universal": "^1.4.0",
     "express": "^5.2.1",
+    "express-rate-limit": "^8.6.0",
     "jsonwebtoken": "^9.0.3",
     "kokoro-js": "^1.2.1",
     "wavefile": "^11.0.0"

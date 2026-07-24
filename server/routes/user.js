@@ -2,10 +2,11 @@ import { Router } from 'express'
 import db from '../db/index.js'
 import { authMiddleware } from '../middleware/auth.js'
 import { VOICES } from '../../src/config.js'
+import { readLimiter, writeLimiter } from '../middleware/rateLimiters.js'
 
 const router = Router()
 
-router.get('/voices', (req, res) => {
+router.get('/voices', readLimiter, (req, res) => {
   const voices = Object.entries(VOICES).map(([key, v]) => ({
     key,
     lang: v.lang,
@@ -17,13 +18,13 @@ router.get('/voices', (req, res) => {
 
 router.use(authMiddleware)
 
-router.get('/settings', (req, res) => {
+router.get('/settings', readLimiter, (req, res) => {
   const user = db.prepare('SELECT voice_key, speed FROM users WHERE id = ?').get(req.user.id)
   if (!user) return res.status(404).json({ error: '유저를 찾을 수 없습니다.' })
   res.json(user)
 })
 
-router.put('/settings', (req, res) => {
+router.put('/settings', writeLimiter, (req, res) => {
   const { voice_key, speed } = req.body
   if (!VOICES[voice_key]) return res.status(400).json({ error: '존재하지 않는 목소리입니다.' })
   if (typeof speed !== 'number' || speed < 0.5 || speed > 2.0) {

@@ -1,6 +1,8 @@
 import express from 'express'
 import cors from 'cors'
 import dotenv from 'dotenv'
+import rateLimit from 'express-rate-limit'
+import { authLimiter, readLimiter } from './middleware/rateLimiters.js'
 import { authMiddleware } from './middleware/auth.js'
 import { adminMiddleware } from './middleware/admin.js'
 import authRouter from './routes/auth.js'
@@ -24,14 +26,16 @@ dotenv.config()
 const app = express()
 const PORT = process.env.SERVER_PORT || 3000
 
+app.set('trust proxy', 1)
+
 app.use(cors({ origin: process.env.WEB_URL, credentials: true }))
 app.use(express.json())
 app.use(cookieParser())
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
-app.use('/samples', express.static(join(__dirname, 'public/samples')))
+app.use('/samples', readLimiter, express.static(join(__dirname, 'public/samples')))
 
-app.use('/auth', authRouter)
+app.use('/auth', authLimiter, authRouter)
 app.use('/user', userRouter)
 app.use('/notices', noticeRouter)
 app.use('/inquiries', inquiryRouter)
