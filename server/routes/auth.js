@@ -77,17 +77,21 @@ router.get('/discord/callback', async (req, res) => {
 
 router.get('/me', (req, res) => {
   const token = req.cookies?.token
-  if (!token) return res.status(401).json({ error: '인증이 필요합니다.' })
+  if (!token) return res.status(200).json(null)
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET)
     const user = db.prepare('SELECT * FROM users WHERE id = ?').get(decoded.id)
     if (!user) {
-      return res.status(404).json({ error: '유저를 찾을 수 없습니다.' })
+      logError(`/auth/me: 존재하지 않는 유저 조회 시도 (id: ${decoded.id})`, 'WARN')
+      return res.status(200).json(null)
     }
     res.json(user)
   } catch (err) {
-    res.status(401).json({ error: '유효하지 않은 토큰입니다.' })
+    if (err.name !== 'TokenExpiredError') {
+      logError(`/auth/me: 유효하지 않은 토큰 - ${err.message}`, 'WARN')
+    }
+    res.status(200).json(null)
   }
 })
 

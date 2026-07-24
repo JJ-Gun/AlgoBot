@@ -15,19 +15,21 @@ export const useUserStore = defineStore('user', () => {
 
   async function fetchUser() {
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/auth/me`,
-        {
-          credentials: 'include'
-        })
-      if (!res.ok) throw new Error('인증 실패')
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/auth/me`, {
+        credentials: 'include',
+      })
       const data = await res.json()
+      if (!data) {
+        user.value = null
+        return
+      }
       user.value = {
         id: data.id,
         username: data.username,
         avatar: data.avatar,
         isAdmin: Boolean(data.is_admin),
       }
-    }catch {
+    } catch {
       user.value = null
     }
   }
