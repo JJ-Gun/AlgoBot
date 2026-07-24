@@ -8,15 +8,26 @@ interface LogEntry {
   id: number
   level: string
   message: string
+  stack: string | null
   created_at: string
 }
 
 const logs = ref<LogEntry[]>([])
 const loading = ref(true)
+const expanded = ref<Set<number>>(new Set())
 
 function formatTime(dateStr: string) {
   const d = new Date(dateStr.replace(' ', 'T') + 'Z')
-  return d.toLocaleString('ko-KR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+  return d.toLocaleString('ko-KR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' })
+}
+
+function toggle(id: number) {
+  if (expanded.value.has(id)) {
+    expanded.value.delete(id)
+  } else {
+    expanded.value.add(id)
+  }
+  expanded.value = new Set(expanded.value)
 }
 
 async function loadLogs() {
@@ -44,14 +55,18 @@ onMounted(loadLogs)
     <div v-else-if="logs.length === 0" class="empty-notice">기록된 로그가 없습니다.</div>
 
     <div v-else class="log-card">
-      <div
-        v-for="log in logs"
-        :key="log.id"
-        class="log-row"
-      >
-        <span class="log-time">{{ formatTime(log.created_at) }}</span>
-        <span class="log-level" :class="log.level === 'ERROR' ? 'error' : 'warn'">[{{ log.level }}]</span>
-        <span class="log-message" :class="log.level === 'ERROR' ? 'error' : 'warn'">{{ log.message }}</span>
+      <div v-for="log in logs" :key="log.id" class="log-entry">
+        <div
+          class="log-row"
+          :class="{ clickable: log.stack }"
+          @click="log.stack && toggle(log.id)"
+        >
+          <span class="log-time">{{ formatTime(log.created_at) }}</span>
+          <span class="log-level" :class="log.level === 'ERROR' ? 'error' : 'warn'">[{{ log.level }}]</span>
+          <span class="log-message" :class="log.level === 'ERROR' ? 'error' : 'warn'">{{ log.message }}</span>
+          <span v-if="log.stack" class="expand-hint">{{ expanded.has(log.id) ? '접기' : '스택 보기' }}</span>
+        </div>
+        <pre v-if="expanded.has(log.id) && log.stack" class="log-stack">{{ log.stack }}</pre>
       </div>
     </div>
   </div>
@@ -85,18 +100,25 @@ onMounted(loadLogs)
   padding: 0 16px;
 }
 
+.log-entry {
+  border-bottom: 0.5px solid #f0f0f0;
+}
+
+.log-entry:last-child {
+  border-bottom: none;
+}
+
 .log-row {
   display: flex;
   align-items: baseline;
   gap: 12px;
   padding: 10px 0;
-  border-bottom: 0.5px solid #f0f0f0;
   font-family: monospace;
   font-size: 13px;
 }
 
-.log-row:last-child {
-  border-bottom: none;
+.log-row.clickable {
+  cursor: pointer;
 }
 
 .log-time {
@@ -111,6 +133,25 @@ onMounted(loadLogs)
 
 .log-message {
   word-break: break-all;
+}
+
+.expand-hint {
+  margin-left: auto;
+  font-size: 11px;
+  color: #378add;
+  flex-shrink: 0;
+}
+
+.log-stack {
+  margin: 0 0 10px;
+  padding: 10px 12px;
+  background: #f5f5f5;
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-all;
+  color: #555;
 }
 
 .error {

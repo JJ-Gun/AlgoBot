@@ -42,5 +42,6 @@ CREATE TABLE IF NOT EXISTS error_logs (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   level TEXT NOT NULL,
   message TEXT NOT NULL,
+  stack TEXT,
   created_at TEXT DEFAULT (datetime('now'))
 );
