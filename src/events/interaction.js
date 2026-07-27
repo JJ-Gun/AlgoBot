@@ -25,7 +25,7 @@ export function registerInteractionHandler(client) {
       if (interaction.customId === 'cleaner_content') {
         state.content = { type: value, value: value === state.content?.type ? state.content.value : undefined };
       }
-      return interaction.update({ content: mainSummary(state), components: buildMainRows(state) });
+      return interaction.update({ content: mainSummary(), components: buildMainRows(state) });
     }
 
     if (interaction.isButton?.() && interaction.customId === 'cleaner_review') {
@@ -44,7 +44,7 @@ export function registerInteractionHandler(client) {
 
     if (interaction.isButton?.() && interaction.customId === 'cleaner_back') {
       const state = getSession(interaction.user.id);
-      return interaction.update({ content: mainSummary(state), components: buildMainRows(state) });
+      return interaction.update({ content: mainSummary(), components: buildMainRows(state) });
     }
 
     if (interaction.isButton?.() && interaction.customId === 'cleaner_cancel') {
@@ -236,7 +236,7 @@ export function registerInteractionHandler(client) {
       if (commandName === '청소') {
         resetSession(interaction.user.id);
         const state = getSession(interaction.user.id);
-        return interaction.reply({ content: mainSummary(state), components: buildMainRows(state), flags: 64 });
+        return interaction.reply({ content: mainSummary(), components: buildMainRows(state), flags: 64 });
       }
     } catch (err) {
       logError(`'/${commandName}' 명령어 처리 중 예외 · guild: ${interaction.guild?.id} · ${err.message}`, 'ERROR', err.stack);

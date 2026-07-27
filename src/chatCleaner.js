@@ -116,22 +116,6 @@ export function buildMainRows(state) {
 }
 
 export function mainSummary(state) {
-  const scopeLabel = state.scope === 'all' ? '모든 채널' : '이 채널';
-  const rangeLabel = RANGE_OPTIONS.find(o => o.value === state.range)?.label ?? '(선택 안 함)';
-  let authorLabel = '모든 메시지';
-  if (state.author?.type === 'me') authorLabel = '내가 보낸 메시지';
-  if (state.author?.type === 'all_bots') authorLabel = '모든 봇이 보낸 메시지';
-  if (state.author?.type === 'specific') {
-    authorLabel = state.author.userId ? `<@${state.author.userId}>가 보낸 메시지` : '특정 멤버/봇 (확인 시 입력)';
-  }
-  let contentLabel = '모든 메시지';
-  if (state.content?.type === 'min_lines') contentLabel = state.content.value ? `${state.content.value}줄 이상 메시지` : 'N줄 이상 (확인 시 입력)';
-  if (state.content?.type === 'attachment') contentLabel = '첨부파일이 있는 메시지';
-  if (state.content?.type === 'contains') contentLabel = state.content.value ? `"${state.content.value}" 포함 메시지` : '텍스트 포함 (확인 시 입력)';
-  if (state.content?.type === 'exact') contentLabel = state.content.value ? `"${state.content.value}"와 완전히 일치` : '완전 일치 텍스트 (확인 시 입력)';
-  if (state.content?.type === 'not_contains') contentLabel = state.content.value ? `"${state.content.value}" 미포함 메시지` : '텍스트 미포함 (확인 시 입력)';
-  if (state.content?.type === 'not_exact') contentLabel = state.content.value ? `"${state.content.value}"와 다른 메시지` : '불일치 텍스트 (확인 시 입력)';
-
   return `채팅 청소 조건을 선택하세요. 다 고르셨으면 확인을 눌러주세요.\n\n**범위**: ${scopeLabel}\n**기간/개수**: ${rangeLabel}\n**작성자**: ${authorLabel}\n**내용**: ${contentLabel}\n(14일 이상 지난 메시지가 포함되면 하나씩 지워져서 시간이 걸릴 수 있어요)`;
 }
 
@@ -285,8 +269,9 @@ export async function executeDelete(messages) {
           await chunk[0].channel.bulkDelete(chunk, true);
         }
         deleted += chunk.length;
-      } catch {
+      } catch (err) {
         failed += chunk.length;
+        logError(`청소 - 메시지 삭제 실패 (채널: ${chunk[0].channel.id}): ${err.message}`, 'ERROR', err.stack);
       }
     }
 
@@ -295,8 +280,9 @@ export async function executeDelete(messages) {
         await m.delete();
         deleted += 1;
         await new Promise(r => setTimeout(r, 300));
-      } catch {
+      } catch (err) {
         failed += 1;
+        logError(`청소 - 메시지 삭제 실패 (채널: ${m.channel.id}): ${err.message}`, 'ERROR', err.stack);
       }
     }
   }
