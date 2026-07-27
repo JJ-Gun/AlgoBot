@@ -226,8 +226,9 @@ node generateSamples.js [voice_key]
 - **웹 서버**: nginx (80 → HTTPS 리다이렉트, 443에서 프론트/백엔드 라우팅)
 
 ### nginx 설정
-- `/auth/discord`, `/auth/me`, `/user/`, `/notices`, `/inquiries`, `/admin/`, `/samples/` → Express(3000) 프록시
+- `/auth/discord`, `/auth/me`, `/auth/logout`, `/user/`, `/notices`, `inquiries`, `/admin/`, `/samples/` → Express(3000) 프록시
 - 그 외 모든 경로 → Vue 빌드 결과물 (`web/dist`) 정적 서빙
+- `/admin/` 등 프론트엔드 페이지 경로와 API 경로가 동일한 구간은, 브라우저가 보내는 `Sec-Fetch-Dest` 헤더로 실제 페이지 진입(document)과 데이터 요청(fetch)을 구분해 각각 SPA/백엔드로 라우팅합니다.
 
 ### 프론트엔드 빌드
 ```bash
@@ -252,7 +253,7 @@ DEV_TOKEN=개발용봇토큰
 NODE_ENV=production
 ```
 
-`NODE_ENV=development`로 설정하면 `DEV_TOKEN`을 사용하는 개발용 봇(아루고수-dev)으로 실행됩니다.
+`NODE_ENV=development`로 설정하면 `DEV_TOKEN`을 사용하는 개발용 봇(알고봇 개발용)으로 실행됩니다.
 
 ---
 
@@ -320,6 +321,37 @@ npm run dev -- --host
 ---
 
 ## 업데이트 로그
+
+<details>
+<summary><strong>2026-07-27</strong> — 관리자 페이지 안정성 개선</summary>
+
+* 관리자 페이지 새로고침 시 정상적으로 동작하지 않던 문제를 수정했습니다.
+  * 로그 페이지 등에서 새로고침해도 데이터가 정상적으로 표시됩니다.
+
+</details>
+
+<details>
+<summary><strong>2026-07-24</strong> — 요청 제한 도입, 에러 로그 강화</summary>
+
+* 과도한 요청으로부터 서버를 보호하는 기능이 추가되었습니다.
+  * 짧은 시간에 너무 많은 요청을 보내면 일시적으로 제한됩니다. 정상적인 사용에는 영향이 없습니다.
+* 로그인 여부 확인 방식이 개선되었습니다.
+  * 비로그인 상태에서도 불필요한 오류가 표시되지 않습니다.
+* 에러 로그가 더 자세해졌습니다.
+  * 오류 발생 시점의 상세 내역(스택 트레이스)이 함께 기록됩니다.
+  * 관리자 페이지에서 로그를 클릭하면 상세 내역을 바로 확인할 수 있습니다.
+* 문의 목록에서 불필요한 개인 정보 노출이 제거되었습니다.
+
+</details>
+
+<details>
+<summary><strong>2026-07-22</strong> — 로그인 보안 강화</summary>
+
+* 로그인 방식이 더 안전해졌습니다.
+  * 로그인 정보가 브라우저에 노출되지 않는 방식(httpOnly 쿠키)으로 저장됩니다.
+  * 로그아웃 시 인증 정보가 확실하게 삭제됩니다.
+
+</details>
 
 <details>
 <summary><strong>2026-07-08</strong> — 운영 환경 구축, 보안 강화</summary>

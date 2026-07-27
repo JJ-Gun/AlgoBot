@@ -64,7 +64,6 @@ onMounted(loadLogs)
           <span class="log-time">{{ formatTime(log.created_at) }}</span>
           <span class="log-level" :class="log.level === 'ERROR' ? 'error' : 'warn'">[{{ log.level }}]</span>
           <span class="log-message" :class="log.level === 'ERROR' ? 'error' : 'warn'">{{ log.message }}</span>
-          <span v-if="log.stack" class="expand-hint">{{ expanded.has(log.id) ? '접기' : '스택 보기' }}</span>
         </div>
         <pre v-if="expanded.has(log.id) && log.stack" class="log-stack">{{ log.stack }}</pre>
       </div>

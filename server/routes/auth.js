@@ -3,6 +3,7 @@ import axios from 'axios'
 import jwt from 'jsonwebtoken'
 import db from '../db/index.js'
 import { logError } from '../db/logger.js'
+import crypto from 'crypto'
 
 const router = Router()
 
@@ -17,19 +18,36 @@ function getOAuthConfig() {
 
 router.get('/discord', (req, res) => {
   const { clientId, redirectUri } = getOAuthConfig()
+  const state = crypto.randomBytes(16).toString('hex')
+
+  res.cookie('oauth_state', state, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV !== 'development',
+    sameSite: 'lax',
+    maxAge: 5 * 60 * 1000,
+  })
+
   const params = new URLSearchParams({
     client_id: clientId,
     redirect_uri: redirectUri,
     response_type: 'code',
     scope: 'identify',
     prompt: 'none',
+    state,
   })
   res.redirect(`https://discord.com/oauth2/authorize?${params}`)
 })
 
 router.get('/discord/callback', async (req, res) => {
-  const { code } = req.query
+  const { code, state } = req.query
+  const savedState = req.cookies?.oauth_state
+  res.clearCookie('oauth_state')
+
   if (!code) return res.status(400).json({ error: 'code가 없습니다.' })
+  if (!state || !savedState || state !== savedState) {
+    logError(`OAuth state 불일치 - 위조된 요청 의심 (IP: ${req.ip})`, 'WARN')
+    return res.status(400).json({ error: '잘못된 접근입니다.' })
+  }
 
   const { clientId, clientSecret, redirectUri } = getOAuthConfig()
 
