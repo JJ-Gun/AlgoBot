@@ -19,6 +19,7 @@ interface Inquiry {
 const inquiries = ref<Inquiry[]>([])
 const loading = ref(true)
 const saving = ref<number | null>(null)
+const deleting = ref<number | null>(null)
 
 const statusMap: Record<string, { label: string; type: 'default' | 'info' | 'success' | 'warning' | 'error' }> = {
   pending: { label: '대기중', type: 'default' },
@@ -78,6 +79,25 @@ async function save(inq: Inquiry) {
     saving.value = null
   }
 }
+
+async function deleteInquiry(id: number) {
+  if (!confirm('정말 삭제하시겠습니까?')) return
+  deleting.value = id
+  try {
+    const res = await fetch(`${import.meta.env.VITE_API_URL}/admin/inquiries/${id}`, {
+      method: 'DELETE',
+      credentials: 'include'
+    })
+    if (!res.ok) throw new Error('삭제 실패')
+    if (expanded.value === id) expanded.value = null
+    await loadInquiries()
+  } catch (err) {
+    console.error('문의 삭제 실패:', err)
+  } finally {
+    deleting.value = null
+  }
+}
+
 </script>
 
 <template>
@@ -119,20 +139,29 @@ async function save(inq: Inquiry) {
             />
           </div>
           <div class="detail-footer">
-            <n-select
-              v-model:value="draftStatus[inq.id]"
-              :options="Object.entries(statusMap).map(([k, v]) => ({ label: v.label, value: k }))"
-              size="small"
-              style="width: 120px;"
-            />
             <n-button
-              type="info"
               size="small"
-              :disabled="saving === inq.id"
-              @click="save(inq)"
+              :disabled="deleting === inq.id"
+              @click="deleteInquiry(inq.id)"
             >
-              {{ saving === inq.id ? '저장 중...' : '저장' }}
+              {{ deleting === inq.id ? '삭제 중...' : '삭제' }}
             </n-button>
+            <div class="detail-footer-right">
+              <n-select
+                v-model:value="draftStatus[inq.id]"
+                :options="Object.entries(statusMap).map(([k, v]) => ({ label: v.label, value: k }))"
+                size="small"
+                style="width: 120px;"
+              />
+              <n-button
+                type="info"
+                size="small"
+                :disabled="saving === inq.id"
+                @click="save(inq)"
+              >
+                {{ saving === inq.id ? '저장 중...' : '저장' }}
+              </n-button>
+            </div>
           </div>
         </div>
       </div>
@@ -227,7 +256,13 @@ async function save(inq: Inquiry) {
 .detail-footer {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.detail-footer-right {
+  display: flex;
+  align-items: center;
   gap: 8px;
 }
 </style>

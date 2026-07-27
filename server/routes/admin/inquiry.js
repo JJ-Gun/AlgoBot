@@ -25,4 +25,9 @@ router.put('/:id', (req, res) => {
   res.json({ success: true })
 })
 
+router.delete('/:id', (req, res) => {
+  db.prepare('DELETE FROM inquiries WHERE id = ?').run(req.params.id)
+  res.json({ success: true })
+})
+
 export default router

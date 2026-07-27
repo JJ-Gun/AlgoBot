@@ -137,7 +137,7 @@ onMounted(loadNotices)
   color: #666;
   line-height: 1.6;
   overflow: hidden;
-  white-space: nowrap;
+  white-space: pre-wrap;
   text-overflow: ellipsis;
 }
 

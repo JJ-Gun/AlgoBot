@@ -79,6 +79,7 @@ async function submit() {
 }
 
 async function deleteNotice(id: number) {
+  if (!confirm('정말 삭제하시겠습니까?')) return
   deleting.value = id
   try {
     const res = await fetch(`${import.meta.env.VITE_API_URL}/admin/notices/${id}`, {
@@ -251,5 +252,6 @@ async function deleteNotice(id: number) {
   font-size: 13px;
   color: #666;
   line-height: 1.6;
+  white-space: pre-wrap;
 }
 </style>
