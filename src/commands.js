@@ -32,7 +32,7 @@ export const commands = [
     .setDescription('현재 재생 중인 문장을 건너뜁니다.'),
   new SlashCommandBuilder()
     .setName('청소')
-    .setDescription('조건에 맞는 채팅 내역을 삭제합니다 (14일 이내 메시지만 가능)')
+    .setDescription('조건에 맞는 채팅 내역을 삭제합니다 (14일 이상 지난 메시지는 삭제가 느려요)')
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
 ].map(cmd => cmd.toJSON());
 

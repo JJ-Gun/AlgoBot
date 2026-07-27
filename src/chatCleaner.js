@@ -1,6 +1,5 @@
 import {
   StringSelectMenuBuilder,
-  UserSelectMenuBuilder,
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
@@ -13,34 +12,26 @@ import { logError } from '../server/db/logger.js';
 
 const sessions = new Map(); // key: userId -> 진행 상태
 
+const DEFAULT_STATE = () => ({
+  scope: 'channel',
+  range: 'count:100',
+  author: { type: 'all' },
+  content: { type: 'all' },
+});
+
 export function getSession(userId) {
-  if (!sessions.has(userId)) {
-    sessions.set(userId, { scope: null, range: null, author: null, content: null });
-  }
+  if (!sessions.has(userId)) sessions.set(userId, DEFAULT_STATE());
   return sessions.get(userId);
 }
 
 export function resetSession(userId) {
-  sessions.set(userId, { scope: null, range: null, author: null, content: null });
+  sessions.set(userId, DEFAULT_STATE());
 }
 
 export function clearSession(userId) {
   sessions.delete(userId);
 }
 
-// --- Step 1: 범위 ---
-export function buildScopeRow() {
-  const menu = new StringSelectMenuBuilder()
-    .setCustomId('cleaner_scope')
-    .setPlaceholder('삭제할 범위를 선택하세요')
-    .addOptions(
-      { label: '이 채널에서', value: 'channel' },
-      { label: '모든 채널에서', value: 'all' },
-    );
-  return new ActionRowBuilder().addComponents(menu);
-}
-
-// --- Step 2: 기간/개수 ---
 const RANGE_OPTIONS = [
   { label: '최근 10개', value: 'count:10' },
   { label: '최근 50개', value: 'count:50' },
@@ -56,92 +47,140 @@ const RANGE_OPTIONS = [
   { label: '최근 14일간', value: 'time:14d' },
 ];
 
-export function buildRangeRow() {
-  const menu = new StringSelectMenuBuilder()
+const AUTHOR_OPTIONS = [
+  { label: '모든 메시지 중에서', value: 'all' },
+  { label: '내가 보낸 메시지 중에서', value: 'me' },
+  { label: '모든 봇이 보낸 메시지 중에서', value: 'all_bots' },
+  { label: '특정 멤버/봇이 보낸 메시지 중에서', value: 'specific' },
+];
+
+const CONTENT_OPTIONS = [
+  { label: '모든 메시지를', value: 'all' },
+  { label: 'N줄 이상 메시지를', value: 'min_lines' },
+  { label: '첨부파일/사진/동영상이 있는 메시지를', value: 'attachment' },
+  { label: '특정 텍스트를 포함하는 메시지를', value: 'contains' },
+  { label: '특정 텍스트와 완전히 일치하는 메시지를', value: 'exact' },
+  { label: '특정 텍스트를 포함하지 않는 메시지를', value: 'not_contains' },
+  { label: '특정 텍스트와 완전히 일치하지 않는 메시지를', value: 'not_exact' },
+];
+
+const TEXT_CONTENT_TYPES = ['min_lines', 'contains', 'exact', 'not_contains', 'not_exact'];
+
+function needsUserInput(state) {
+  return state.author?.type === 'specific' && !state.author.userId;
+}
+
+function needsTextInput(state) {
+  return TEXT_CONTENT_TYPES.includes(state.content?.type) && (state.content.value === undefined || state.content.value === null);
+}
+
+export function hasPendingInput(state) {
+  return needsUserInput(state) || needsTextInput(state);
+}
+
+// --- 한 화면에 다 보여주는 메인 선택 UI ---
+export function buildMainRows(state) {
+  const scopeMenu = new StringSelectMenuBuilder()
+    .setCustomId('cleaner_scope')
+    .setPlaceholder('삭제할 범위를 선택하세요')
+    .addOptions(
+      { label: '이 채널에서', value: 'channel', default: state.scope === 'channel' },
+      { label: '모든 채널에서', value: 'all', default: state.scope === 'all' },
+    );
+
+  const rangeMenu = new StringSelectMenuBuilder()
     .setCustomId('cleaner_range')
     .setPlaceholder('삭제할 기간/개수를 선택하세요')
-    .addOptions(RANGE_OPTIONS);
-  return new ActionRowBuilder().addComponents(menu);
-}
+    .addOptions(RANGE_OPTIONS.map(o => ({ ...o, default: o.value === state.range })));
 
-// --- Step 3: 작성자 필터 ---
-export function buildAuthorRow() {
-  const menu = new StringSelectMenuBuilder()
+  const authorMenu = new StringSelectMenuBuilder()
     .setCustomId('cleaner_author')
     .setPlaceholder('작성자 필터를 선택하세요')
-    .addOptions(
-      { label: '모든 메시지 중에서', value: 'all' },
-      { label: '내가 보낸 메시지 중에서', value: 'me' },
-      { label: '모든 봇이 보낸 메시지 중에서', value: 'all_bots' },
-      { label: '특정 멤버/봇이 보낸 메시지 중에서', value: 'specific' },
-    );
-  return new ActionRowBuilder().addComponents(menu);
-}
+    .addOptions(AUTHOR_OPTIONS.map(o => ({ ...o, default: o.value === state.author?.type })));
 
-export function buildAuthorUserSelectRow() {
-  const menu = new UserSelectMenuBuilder()
-    .setCustomId('cleaner_author_user')
-    .setPlaceholder('멤버 또는 봇을 선택하세요');
-  return new ActionRowBuilder().addComponents(menu);
-}
-
-// --- Step 4: 내용 필터 ---
-export function buildContentRow() {
-  const menu = new StringSelectMenuBuilder()
+  const contentMenu = new StringSelectMenuBuilder()
     .setCustomId('cleaner_content')
     .setPlaceholder('내용 필터를 선택하세요')
-    .addOptions(
-      { label: '모든 메시지를', value: 'all' },
-      { label: 'N줄 이상 메시지를', value: 'min_lines' },
-      { label: '첨부파일/사진/동영상이 있는 메시지를', value: 'attachment' },
-      { label: '특정 텍스트를 포함하는 메시지를', value: 'contains' },
-      { label: '특정 텍스트와 완전히 일치하는 메시지를', value: 'exact' },
-      { label: '특정 텍스트를 포함하지 않는 메시지를', value: 'not_contains' },
-      { label: '특정 텍스트와 완전히 일치하지 않는 메시지를', value: 'not_exact' },
-    );
-  return new ActionRowBuilder().addComponents(menu);
-}
+    .addOptions(CONTENT_OPTIONS.map(o => ({ ...o, default: o.value === state.content?.type })));
 
-export function buildContentModal(kind) {
-  const modal = new ModalBuilder()
-    .setCustomId(`cleaner_content_modal:${kind}`)
-    .setTitle(kind === 'min_lines' ? '최소 줄 수 입력' : '텍스트 입력');
-
-  const input = new TextInputBuilder()
-    .setCustomId('value')
-    .setLabel(kind === 'min_lines' ? '몇 줄 이상인 메시지를 지울까요?' : '기준 텍스트를 입력하세요')
-    .setStyle(TextInputStyle.Short)
-    .setRequired(true);
-
-  modal.addComponents(new ActionRowBuilder().addComponents(input));
-  return modal;
-}
-
-// --- 확인 단계 ---
-export function buildConfirmRow() {
-  const confirm = new ButtonBuilder().setCustomId('cleaner_confirm').setLabel('제거').setStyle(ButtonStyle.Danger);
+  const confirm = new ButtonBuilder().setCustomId('cleaner_review').setLabel('확인').setStyle(ButtonStyle.Primary);
   const cancel = new ButtonBuilder().setCustomId('cleaner_cancel').setLabel('취소').setStyle(ButtonStyle.Secondary);
-  return new ActionRowBuilder().addComponents(confirm, cancel);
+
+  return [
+    new ActionRowBuilder().addComponents(scopeMenu),
+    new ActionRowBuilder().addComponents(rangeMenu),
+    new ActionRowBuilder().addComponents(authorMenu),
+    new ActionRowBuilder().addComponents(contentMenu),
+    new ActionRowBuilder().addComponents(confirm, cancel),
+  ];
 }
 
-export function summarize(state) {
+export function mainSummary(state) {
   const scopeLabel = state.scope === 'all' ? '모든 채널' : '이 채널';
-  const rangeLabel = RANGE_OPTIONS.find(o => o.value === state.range)?.label ?? state.range;
+  const rangeLabel = RANGE_OPTIONS.find(o => o.value === state.range)?.label ?? '(선택 안 함)';
   let authorLabel = '모든 메시지';
   if (state.author?.type === 'me') authorLabel = '내가 보낸 메시지';
   if (state.author?.type === 'all_bots') authorLabel = '모든 봇이 보낸 메시지';
-  if (state.author?.type === 'specific') authorLabel = `<@${state.author.userId}>가 보낸 메시지`;
+  if (state.author?.type === 'specific') {
+    authorLabel = state.author.userId ? `<@${state.author.userId}>가 보낸 메시지` : '특정 멤버/봇 (확인 시 입력)';
+  }
   let contentLabel = '모든 메시지';
-  if (state.content?.type === 'min_lines') contentLabel = `${state.content.value}줄 이상 메시지`;
+  if (state.content?.type === 'min_lines') contentLabel = state.content.value ? `${state.content.value}줄 이상 메시지` : 'N줄 이상 (확인 시 입력)';
   if (state.content?.type === 'attachment') contentLabel = '첨부파일이 있는 메시지';
-  if (state.content?.type === 'contains') contentLabel = `"${state.content.value}" 포함 메시지`;
-  if (state.content?.type === 'exact') contentLabel = `"${state.content.value}"와 완전히 일치하는 메시지`;
-  if (state.content?.type === 'not_contains') contentLabel = `"${state.content.value}" 미포함 메시지`;
-  if (state.content?.type === 'not_exact') contentLabel = `"${state.content.value}"와 다른 메시지`;
+  if (state.content?.type === 'contains') contentLabel = state.content.value ? `"${state.content.value}" 포함 메시지` : '텍스트 포함 (확인 시 입력)';
+  if (state.content?.type === 'exact') contentLabel = state.content.value ? `"${state.content.value}"와 완전히 일치` : '완전 일치 텍스트 (확인 시 입력)';
+  if (state.content?.type === 'not_contains') contentLabel = state.content.value ? `"${state.content.value}" 미포함 메시지` : '텍스트 미포함 (확인 시 입력)';
+  if (state.content?.type === 'not_exact') contentLabel = state.content.value ? `"${state.content.value}"와 다른 메시지` : '불일치 텍스트 (확인 시 입력)';
 
-  return `**범위**: ${scopeLabel}\n**기간/개수**: ${rangeLabel}\n**작성자**: ${authorLabel}\n**내용**: ${contentLabel}\n\n위 조건에 맞는 메시지를 삭제할까요?`;
+  return `채팅 청소 조건을 선택하세요. 다 고르셨으면 확인을 눌러주세요.\n\n**범위**: ${scopeLabel}\n**기간/개수**: ${rangeLabel}\n**작성자**: ${authorLabel}\n**내용**: ${contentLabel}\n(14일 이상 지난 메시지가 포함되면 하나씩 지워져서 시간이 걸릴 수 있어요)`;
 }
 
+// --- 추가 입력이 필요할 때 뜨는 모달 ---
+export function buildPendingModal(state) {
+  const modal = new ModalBuilder().setCustomId('cleaner_pending_modal').setTitle('추가 입력이 필요해요');
+  const rows = [];
+  if (needsUserInput(state)) {
+    rows.push(new ActionRowBuilder().addComponents(
+      new TextInputBuilder().setCustomId('userId').setLabel('멤버/봇 멘션 또는 ID').setStyle(TextInputStyle.Short).setRequired(true)
+    ));
+  }
+  if (needsTextInput(state)) {
+    const label = state.content.type === 'min_lines' ? '몇 줄 이상인 메시지를 지울까요? (숫자)' : '기준 텍스트를 입력하세요';
+    rows.push(new ActionRowBuilder().addComponents(
+      new TextInputBuilder().setCustomId('contentValue').setLabel(label).setStyle(TextInputStyle.Short).setRequired(true)
+    ));
+  }
+  modal.addComponents(...rows);
+  return modal;
+}
+
+export function applyPendingModal(state, interaction) {
+  if (needsUserInput(state)) {
+    const raw = interaction.fields.getTextInputValue('userId').trim();
+    const match = raw.match(/\d{15,}/);
+    state.author.userId = match ? match[0] : raw;
+  }
+  if (needsTextInput(state)) {
+    state.content.value = interaction.fields.getTextInputValue('contentValue').trim();
+  }
+}
+
+// --- 최종 확인 화면 ---
+export function buildFinalRow() {
+  const execute = new ButtonBuilder().setCustomId('cleaner_execute').setLabel('삭제 실행').setStyle(ButtonStyle.Danger);
+  const back = new ButtonBuilder().setCustomId('cleaner_back').setLabel('다시 선택').setStyle(ButtonStyle.Secondary);
+  const cancel = new ButtonBuilder().setCustomId('cleaner_cancel').setLabel('취소').setStyle(ButtonStyle.Secondary);
+  return new ActionRowBuilder().addComponents(execute, back, cancel);
+}
+
+export function finalSummary(state) {
+  return mainSummary(state).replace(
+    '채팅 청소 조건을 선택하세요. 다 고르셨으면 확인을 눌러주세요.\n\n',
+    '이 조건으로 삭제할까요?\n\n'
+  );
+}
+
+// --- 실행 로직 ---
 function getCutoffDate(range) {
   const now = new Date();
   switch (range) {
@@ -152,7 +191,7 @@ function getCutoffDate(range) {
     case 'time:yesterday': { const d = new Date(now); d.setDate(d.getDate() - 1); d.setHours(0, 0, 0, 0); return d; }
     case 'time:7d': return new Date(now - 7 * 24 * 60 * 60 * 1000);
     case 'time:14d': return new Date(now - 14 * 24 * 60 * 60 * 1000);
-    default: return null; // time:all
+    default: return null;
   }
 }
 

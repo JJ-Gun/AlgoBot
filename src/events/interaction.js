@@ -4,8 +4,9 @@ import { VOICES, DEFAULT_VOICE, audioPlayers, ttsChanels, settings, saveSettings
 import { playTTS, skipTTS } from '../player.js';
 import {
   getSession, resetSession, clearSession,
-  buildScopeRow, buildRangeRow, buildAuthorRow, buildAuthorUserSelectRow,
-  buildContentRow, buildContentModal, buildConfirmRow, summarize,
+  buildMainRows, mainSummary,
+  buildPendingModal, applyPendingModal, hasPendingInput,
+  buildFinalRow, finalSummary,
   collectAllMessages, executeDelete,
 } from '../chatCleaner.js';
 import { logError } from '../../server/db/logger.js';
@@ -14,51 +15,36 @@ const WEB_URL = process.env.WEB_URL
 
 export function registerInteractionHandler(client) {
   client.on(Events.InteractionCreate, async (interaction) => {
-    // --- 채팅정리 마법사 ---
-    if (interaction.isStringSelectMenu() && interaction.customId === 'cleaner_scope') {
+    // --- 채팅 청소 (한 화면에서 전부 선택) ---
+    if (interaction.isStringSelectMenu() && ['cleaner_scope', 'cleaner_range', 'cleaner_author', 'cleaner_content'].includes(interaction.customId)) {
       const state = getSession(interaction.user.id);
-      state.scope = interaction.values[0];
-      return interaction.update({ content: '삭제할 기간/개수를 선택하세요.', components: [buildRangeRow()] });
-    }
-
-    if (interaction.isStringSelectMenu() && interaction.customId === 'cleaner_range') {
-      const state = getSession(interaction.user.id);
-      state.range = interaction.values[0];
-      return interaction.update({ content: '작성자 필터를 선택하세요.', components: [buildAuthorRow()] });
-    }
-
-    if (interaction.isStringSelectMenu() && interaction.customId === 'cleaner_author') {
       const value = interaction.values[0];
-      if (value === 'specific') {
-        return interaction.update({ content: '메시지를 지울 멤버 또는 봇을 선택하세요.', components: [buildAuthorUserSelectRow()] });
+      if (interaction.customId === 'cleaner_scope') state.scope = value;
+      if (interaction.customId === 'cleaner_range') state.range = value;
+      if (interaction.customId === 'cleaner_author') state.author = { type: value, userId: value === 'specific' ? state.author?.userId : undefined };
+      if (interaction.customId === 'cleaner_content') {
+        state.content = { type: value, value: value === state.content?.type ? state.content.value : undefined };
       }
-      const state = getSession(interaction.user.id);
-      state.author = { type: value };
-      return interaction.update({ content: '내용 필터를 선택하세요.', components: [buildContentRow()] });
+      return interaction.update({ content: mainSummary(state), components: buildMainRows(state) });
     }
 
-    if (interaction.isUserSelectMenu?.() && interaction.customId === 'cleaner_author_user') {
+    if (interaction.isButton?.() && interaction.customId === 'cleaner_review') {
       const state = getSession(interaction.user.id);
-      state.author = { type: 'specific', userId: interaction.values[0] };
-      return interaction.update({ content: '내용 필터를 선택하세요.', components: [buildContentRow()] });
-    }
-
-    if (interaction.isStringSelectMenu() && interaction.customId === 'cleaner_content') {
-      const value = interaction.values[0];
-      if (['min_lines', 'contains', 'exact', 'not_contains', 'not_exact'].includes(value)) {
-        return interaction.showModal(buildContentModal(value));
+      if (hasPendingInput(state)) {
+        return interaction.showModal(buildPendingModal(state));
       }
-      const state = getSession(interaction.user.id);
-      state.content = { type: 'all' };
-      return interaction.update({ content: summarize(state), components: [buildConfirmRow()] });
+      return interaction.update({ content: finalSummary(state), components: [buildFinalRow()] });
     }
 
-    if (interaction.isModalSubmit?.() && interaction.customId.startsWith('cleaner_content_modal:')) {
-      const kind = interaction.customId.split(':')[1];
-      const value = interaction.fields.getTextInputValue('value');
+    if (interaction.isModalSubmit?.() && interaction.customId === 'cleaner_pending_modal') {
       const state = getSession(interaction.user.id);
-      state.content = { type: kind, value };
-      return interaction.update({ content: summarize(state), components: [buildConfirmRow()] });
+      applyPendingModal(state, interaction);
+      return interaction.update({ content: finalSummary(state), components: [buildFinalRow()] });
+    }
+
+    if (interaction.isButton?.() && interaction.customId === 'cleaner_back') {
+      const state = getSession(interaction.user.id);
+      return interaction.update({ content: mainSummary(state), components: buildMainRows(state) });
     }
 
     if (interaction.isButton?.() && interaction.customId === 'cleaner_cancel') {
@@ -66,7 +52,7 @@ export function registerInteractionHandler(client) {
       return interaction.update({ content: '취소되었습니다.', components: [] });
     }
 
-    if (interaction.isButton?.() && interaction.customId === 'cleaner_confirm') {
+    if (interaction.isButton?.() && interaction.customId === 'cleaner_execute') {
       const state = getSession(interaction.user.id);
       await interaction.update({ content: '메시지를 수집하는 중...', components: [] });
       try {
@@ -249,11 +235,8 @@ export function registerInteractionHandler(client) {
       }
       if (commandName === '청소') {
         resetSession(interaction.user.id);
-        return interaction.reply({
-          content: '삭제할 범위를 선택하세요.\n(14일 이상 지난 메시지가 포함되면 하나씩 지워져서 시간이 걸릴 수 있어요)',
-          components: [buildScopeRow()],
-          flags: 64,
-        });
+        const state = getSession(interaction.user.id);
+        return interaction.reply({ content: mainSummary(state), components: buildMainRows(state), flags: 64 });
       }
     } catch (err) {
       logError(`'/${commandName}' 명령어 처리 중 예외 · guild: ${interaction.guild?.id} · ${err.message}`, 'ERROR', err.stack);
