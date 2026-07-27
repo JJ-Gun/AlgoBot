@@ -115,8 +115,8 @@ export function buildMainRows(state) {
   ];
 }
 
-export function mainSummary(state) {
-  return `채팅 청소 조건을 선택하세요. 다 고르셨으면 확인을 눌러주세요.\n\n**범위**: ${scopeLabel}\n**기간/개수**: ${rangeLabel}\n**작성자**: ${authorLabel}\n**내용**: ${contentLabel}\n(14일 이상 지난 메시지가 포함되면 하나씩 지워져서 시간이 걸릴 수 있어요)`;
+export function mainSummary() {
+  return '채팅 청소 조건을 선택하세요. 다 고르셨으면 확인을 눌러주세요.\n(14일 이상 지난 메시지가 포함되면 하나씩 지워져서 시간이 걸릴 수 있어요)';
 }
 
 // --- 추가 입력이 필요할 때 뜨는 모달 ---
@@ -158,10 +158,21 @@ export function buildFinalRow() {
 }
 
 export function finalSummary(state) {
-  return mainSummary(state).replace(
-    '채팅 청소 조건을 선택하세요. 다 고르셨으면 확인을 눌러주세요.\n\n',
-    '이 조건으로 삭제할까요?\n\n'
-  );
+  const scopeLabel = state.scope === 'all' ? '모든 채널' : '이 채널';
+  const rangeLabel = RANGE_OPTIONS.find(o => o.value === state.range)?.label ?? '(선택 안 함)';
+  let authorLabel = '모든 메시지';
+  if (state.author?.type === 'me') authorLabel = '내가 보낸 메시지';
+  if (state.author?.type === 'all_bots') authorLabel = '모든 봇이 보낸 메시지';
+  if (state.author?.type === 'specific') authorLabel = `<@${state.author.userId}>가 보낸 메시지`;
+  let contentLabel = '모든 메시지';
+  if (state.content?.type === 'min_lines') contentLabel = `${state.content.value}줄 이상 메시지`;
+  if (state.content?.type === 'attachment') contentLabel = '첨부파일이 있는 메시지';
+  if (state.content?.type === 'contains') contentLabel = `"${state.content.value}" 포함 메시지`;
+  if (state.content?.type === 'exact') contentLabel = `"${state.content.value}"와 완전히 일치하는 메시지`;
+  if (state.content?.type === 'not_contains') contentLabel = `"${state.content.value}" 미포함 메시지`;
+  if (state.content?.type === 'not_exact') contentLabel = `"${state.content.value}"와 다른 메시지`;
+
+  return `이 조건으로 삭제할까요?\n\n**범위**: ${scopeLabel}\n**기간/개수**: ${rangeLabel}\n**작성자**: ${authorLabel}\n**내용**: ${contentLabel}`;
 }
 
 // --- 실행 로직 ---
