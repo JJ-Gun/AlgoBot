@@ -307,6 +307,7 @@ async function submit() {
 .detail-content {
   font-size: 13px;
   line-height: 1.6;
+  white-space: pre-wrap;
 }
 
 .reply {
