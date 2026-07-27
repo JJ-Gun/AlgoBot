@@ -16,6 +16,7 @@ import adminNoticeRouter from './routes/admin/notice.js'
 import adminInquiryRouter from './routes/admin/inquiry.js'
 import { startHealthMonitor } from './db/healthMonitor.js'
 import cookieParser from 'cookie-parser'
+import helmet from 'helmet'
 
 
 import { join, dirname } from 'path'
@@ -27,6 +28,7 @@ const app = express()
 const PORT = process.env.SERVER_PORT || 3000
 
 app.set('trust proxy', 1)
+app.use(helmet())
 
 app.use(cors({ origin: process.env.WEB_URL, credentials: true }))
 app.use(express.json())
