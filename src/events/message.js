@@ -20,6 +20,7 @@ export function registerMessageHandler(client) {
     // 커스텀 이모지, 멘션만 있으면 제외
     const cleaned = message.content
       .replace(/<a?:\w+:\d+>/g, '')
+      .replace(/:[^\s:]+:/g, '')
       .replace(/<@!?\d+>/g, '')
       .replace(/<#\d+>/g, '')
       .trim();
@@ -30,7 +31,7 @@ export function registerMessageHandler(client) {
 
     const voiceKey = getUserVoice(message.author.id);
     try {
-      await playTTS(message.content, voiceKey, message.guild.id, voiceChannel, null, message.author.id);
+      await playTTS(cleaned, voiceKey, message.guild.id, voiceChannel, null, message.author.id);
     } catch (err) {
       logError(`메시지 TTS 처리 실패 · guild: ${message.guild.id} · ${err.message}`, 'ERROR', err.stack);
       message.react('<:speakfail:1498223231369482381>').catch(() => {});

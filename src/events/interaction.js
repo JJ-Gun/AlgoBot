@@ -2,12 +2,90 @@ import { Events, ActionRowBuilder, StringSelectMenuBuilder, EmbedBuilder } from 
 import { getVoiceConnection, joinVoiceChannel, createAudioPlayer } from '@discordjs/voice';
 import { VOICES, DEFAULT_VOICE, audioPlayers, ttsChanels, settings, saveSettings, queueMode, getUserVoice, setUserVoice } from '../config.js';
 import { playTTS, skipTTS } from '../player.js';
+import {
+  getSession, resetSession, clearSession,
+  buildScopeRow, buildRangeRow, buildAuthorRow, buildAuthorUserSelectRow,
+  buildContentRow, buildContentModal, buildConfirmRow, summarize,
+  collectAllMessages, executeDelete,
+} from '../chatCleaner.js';
 import { logError } from '../../server/db/logger.js';
 
 const WEB_URL = process.env.WEB_URL
 
 export function registerInteractionHandler(client) {
   client.on(Events.InteractionCreate, async (interaction) => {
+    // --- 채팅정리 마법사 ---
+    if (interaction.isStringSelectMenu() && interaction.customId === 'cleaner_scope') {
+      const state = getSession(interaction.user.id);
+      state.scope = interaction.values[0];
+      return interaction.update({ content: '삭제할 기간/개수를 선택하세요.', components: [buildRangeRow()] });
+    }
+
+    if (interaction.isStringSelectMenu() && interaction.customId === 'cleaner_range') {
+      const state = getSession(interaction.user.id);
+      state.range = interaction.values[0];
+      return interaction.update({ content: '작성자 필터를 선택하세요.', components: [buildAuthorRow()] });
+    }
+
+    if (interaction.isStringSelectMenu() && interaction.customId === 'cleaner_author') {
+      const value = interaction.values[0];
+      if (value === 'specific') {
+        return interaction.update({ content: '메시지를 지울 멤버 또는 봇을 선택하세요.', components: [buildAuthorUserSelectRow()] });
+      }
+      const state = getSession(interaction.user.id);
+      state.author = { type: value };
+      return interaction.update({ content: '내용 필터를 선택하세요.', components: [buildContentRow()] });
+    }
+
+    if (interaction.isUserSelectMenu?.() && interaction.customId === 'cleaner_author_user') {
+      const state = getSession(interaction.user.id);
+      state.author = { type: 'specific', userId: interaction.values[0] };
+      return interaction.update({ content: '내용 필터를 선택하세요.', components: [buildContentRow()] });
+    }
+
+    if (interaction.isStringSelectMenu() && interaction.customId === 'cleaner_content') {
+      const value = interaction.values[0];
+      if (['min_lines', 'contains', 'exact', 'not_contains', 'not_exact'].includes(value)) {
+        return interaction.showModal(buildContentModal(value));
+      }
+      const state = getSession(interaction.user.id);
+      state.content = { type: 'all' };
+      return interaction.update({ content: summarize(state), components: [buildConfirmRow()] });
+    }
+
+    if (interaction.isModalSubmit?.() && interaction.customId.startsWith('cleaner_content_modal:')) {
+      const kind = interaction.customId.split(':')[1];
+      const value = interaction.fields.getTextInputValue('value');
+      const state = getSession(interaction.user.id);
+      state.content = { type: kind, value };
+      return interaction.update({ content: summarize(state), components: [buildConfirmRow()] });
+    }
+
+    if (interaction.isButton?.() && interaction.customId === 'cleaner_cancel') {
+      clearSession(interaction.user.id);
+      return interaction.update({ content: '취소되었습니다.', components: [] });
+    }
+
+    if (interaction.isButton?.() && interaction.customId === 'cleaner_confirm') {
+      const state = getSession(interaction.user.id);
+      await interaction.update({ content: '메시지를 수집하는 중...', components: [] });
+      try {
+        const messages = await collectAllMessages(interaction, state);
+        if (messages.length === 0) {
+          clearSession(interaction.user.id);
+          return interaction.editReply({ content: '조건에 맞는 메시지가 없습니다.' });
+        }
+        await interaction.editReply({ content: `${messages.length}개 메시지를 삭제하는 중... (14일 지난 메시지가 섞여 있으면 시간이 더 걸려요)` });
+        const { deleted, failed } = await executeDelete(messages);
+        clearSession(interaction.user.id);
+        return interaction.editReply({ content: `삭제 완료: ${deleted}개 삭제됨${failed ? `, ${failed}개 실패` : ''}` });
+      } catch (err) {
+        logError(`청소 실행 실패 · guild: ${interaction.guild?.id} · ${err.message}`, 'ERROR', err.stack);
+        clearSession(interaction.user.id);
+        return interaction.editReply({ content: '삭제 중 오류가 발생했습니다.' });
+      }
+    }
+
     const { commandName } = interaction;
 
     // Select Menu 선택 처리
@@ -94,7 +172,7 @@ export function registerInteractionHandler(client) {
 
         if (currentChannelId) {
           const prevChannel = interaction.guild.channels.cache.get(currentChannelId);
-          const prevChannelName = prevChannel ? prevChannel.name : currentChannelId;
+          const prevChannelName = prevChannel ? prevChannel.name : '(삭제된 채널)';
           ttsChanels.set(guildId, newChannelId);
           settings.ttsChannels[guildId] = newChannelId;
           saveSettings();
@@ -168,6 +246,14 @@ export function registerInteractionHandler(client) {
       if (commandName === '스킵') {
         const success = skipTTS(interaction.guild.id);
         return interaction.reply({ content: success ? '건너뜁니다!' : '재생 중인 문장이 없어요.', flags: 64 });
+      }
+      if (commandName === '청소') {
+        resetSession(interaction.user.id);
+        return interaction.reply({
+          content: '삭제할 범위를 선택하세요.\n(14일 이상 지난 메시지가 포함되면 하나씩 지워져서 시간이 걸릴 수 있어요)',
+          components: [buildScopeRow()],
+          flags: 64,
+        });
       }
     } catch (err) {
       logError(`'/${commandName}' 명령어 처리 중 예외 · guild: ${interaction.guild?.id} · ${err.message}`, 'ERROR', err.stack);

@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, REST, Routes } from 'discord.js';
+import { SlashCommandBuilder, REST, Routes, PermissionFlagsBits } from 'discord.js';
 
 export const commands = [
   new SlashCommandBuilder()
@@ -30,6 +30,10 @@ export const commands = [
   new SlashCommandBuilder()
     .setName('스킵')
     .setDescription('현재 재생 중인 문장을 건너뜁니다.'),
+  new SlashCommandBuilder()
+    .setName('청소')
+    .setDescription('조건에 맞는 채팅 내역을 삭제합니다 (14일 이내 메시지만 가능)')
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
 ].map(cmd => cmd.toJSON());
 
 export async function registerCommands(clientId, token) {

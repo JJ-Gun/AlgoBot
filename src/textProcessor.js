@@ -33,6 +33,11 @@ const specialMap = {
   '=': '이퀄',
 };
 
+// 같은 글자 반복 읽는 횟수 제한
+function limitRepeatedChars(text, maxRepeat = 5) {
+  return text.replace(/(.)\1{5,}/gu, (_, ch) => ch.repeat(maxRepeat));
+}
+
 // edge/melo용 영어 → 한글 변환
 function englishToKorean(word) {
   const lower = word.toLowerCase();
@@ -44,6 +49,7 @@ function englishToKorean(word) {
 }
 
 export function preprocessText(text) {
+  text = limitRepeatedChars(text);
   const tokens = text.match(/[a-zA-Z]+|[0-9]+|[ㄱ-ㅎㅏ-ㅣ]|[가-힣]|\s|./g) || [];
   return tokens.map(token => {
     if (/^[a-zA-Z]+$/.test(token)) return englishToKorean(token);
