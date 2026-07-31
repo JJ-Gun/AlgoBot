@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, nextTick, type ComponentPublicInstance } from 'vue'
 import { useRoute } from 'vue-router'
 
 interface Notice {
@@ -14,6 +14,13 @@ const route = useRoute()
 const notices = ref<Notice[]>([])
 const loading = ref(true)
 const expanded = ref<Set<number>>(new Set())
+const hasOverflow = ref<Set<number>>(new Set())
+const contentRefs = new Map<number, HTMLElement>()
+
+function setContentRef(id: number, el: Element | ComponentPublicInstance | null) {
+  if (el) contentRefs.set(id, el as HTMLElement)
+  else contentRefs.delete(id)
+}
 
 function toggle(id: number) {
   if (expanded.value.has(id)) {
@@ -26,6 +33,17 @@ function toggle(id: number) {
 
 function formatDate(dateStr: string) {
   return dateStr.slice(0, 10).replace(/-/g, '. ')
+}
+
+async function checkOverflow() {
+  await nextTick()
+  const overflowing = new Set<number>()
+  for (const [id, el] of contentRefs) {
+    if (el.scrollHeight > el.clientHeight + 1) {
+      overflowing.add(id)
+    }
+  }
+  hasOverflow.value = overflowing
 }
 
 async function loadNotices() {
@@ -42,6 +60,7 @@ async function loadNotices() {
     console.error('공지사항 로딩 실패:', err)
   } finally {
     loading.value = false
+    await checkOverflow()
   }
 }
 
@@ -68,8 +87,15 @@ onMounted(loadNotices)
           <div class="notice-title">{{ notice.title }}</div>
           <div class="notice-date">{{ formatDate(notice.created_at) }}</div>
         </div>
-        <div class="notice-content" :class="{ expanded: expanded.has(notice.id) }">
+        <div
+          class="notice-content"
+          :class="{ expanded: expanded.has(notice.id) }"
+          :ref="(el) => setContentRef(notice.id, el)"
+        >
           {{ notice.content }}
+        </div>
+        <div v-if="hasOverflow.has(notice.id) && !expanded.has(notice.id)" class="notice-more">
+          더보기 ▾
         </div>
       </div>
     </div>
@@ -150,5 +176,11 @@ onMounted(loadNotices)
   display: block;
   -webkit-line-clamp: unset;
   line-clamp: unset;
+}
+
+.notice-more {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #378add;
 }
 </style>
