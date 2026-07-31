@@ -136,14 +136,19 @@ onMounted(loadNotices)
   font-size: 13px;
   color: #666;
   line-height: 1.6;
-  overflow: hidden;
   white-space: pre-wrap;
-  text-overflow: ellipsis;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  -webkit-box-orient: vertical;
 }
 
 .notice-content.expanded {
-  white-space: normal;
+  white-space: pre-wrap;
   overflow: visible;
-  text-overflow: unset;
+  display: block;
+  -webkit-line-clamp: unset;
+  line-clamp: unset;
 }
 </style>
