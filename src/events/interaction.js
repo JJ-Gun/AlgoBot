@@ -212,12 +212,15 @@ export function registerInteractionHandler(client) {
 
         await interaction.deferReply({ flags: 64 });
         const voiceKey = getUserVoice(interaction.user.id)
+        const reportFail = (err) => {
+          logError(`/tts 명령어 처리 실패 · guild: ${interaction.guild.id} · ${err.message}`, 'ERROR', err.stack);
+          interaction.editReply({ content: 'TTS 생성 중 오류가 발생했습니다.' }).catch(() => {});
+        };
         try {
-          await playTTS(text, voiceKey, interaction.guild.id, voiceChannel, interaction, interaction.user.id);
+          await playTTS(text, voiceKey, interaction.guild.id, voiceChannel, interaction, interaction.user.id, reportFail);
           await interaction.editReply({ content: '재생 중!' });
         } catch (err) {
-          logError(`/tts 명령어 처리 실패 · guild: ${interaction.guild.id} · ${err.message}`, 'ERROR', err.stack);
-          await interaction.editReply({ content: 'TTS 생성 중 오류가 발생했습니다.' });
+          reportFail(err);
         }
         return;
       }

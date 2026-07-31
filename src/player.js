@@ -14,9 +14,18 @@ import { logError } from '../server/db/logger.js';
 
 const generateChains = new Map();
 
-function createBufferResource(buffer) {
-  return createAudioResource(Readable.from(buffer), {
+function createBufferResource(audio) {
+  const input = Buffer.isBuffer(audio) ? Readable.from(audio) : audio;
+  return createAudioResource(input, {
     inputType: StreamType.Arbitrary,
+  });
+}
+
+function attachStreamErrorHandler(audio, onError) {
+  if (Buffer.isBuffer(audio) || typeof audio?.on !== 'function') return;
+  audio.on('error', (err) => {
+    if (onError) onError(err);
+    else logError(`TTS 스트리밍 오류: ${err.message}`, 'ERROR', err.stack);
   });
 }
 
@@ -57,7 +66,7 @@ export function clearQueue(guildId) {
   generateChains.set(guildId, Promise.resolve());
 }
 
-export async function playTTS(text, voiceKey, guildId, voiceChannel, interaction = null, userId = null) {
+export async function playTTS(text, voiceKey, guildId, voiceChannel, interaction = null, userId = null, onPlaybackError = null) {
   let connection = getVoiceConnection(guildId);
 
   if (!connection) {
@@ -101,8 +110,10 @@ export async function playTTS(text, voiceKey, guildId, voiceChannel, interaction
         console.log(`[TTS] generated ${(performance.now() - t0).toFixed(0)}ms`);
       } catch (err) {
         logError(`TTS 생성 실패 (${voiceKey}) · guild: ${guildId} · ${err.message}`, 'ERROR', err.stack);
+        if (onPlaybackError) onPlaybackError(err);
         return;
       }
+      attachStreamErrorHandler(audio, onPlaybackError);
       logTTS(guildId, userId, voiceKey);
       if (!ttsQueues.has(guildId)) ttsQueues.set(guildId, []);
       ttsQueues.get(guildId).push({ audio });
@@ -119,6 +130,7 @@ export async function playTTS(text, voiceKey, guildId, voiceChannel, interaction
       logError(`TTS 생성 실패 (${voiceKey}) · guild: ${guildId} · ${err.message}`, 'ERROR', err.stack);
       throw err;
     }
+    attachStreamErrorHandler(audio, onPlaybackError);
     logTTS(guildId, userId, voiceKey);
     const player = audioPlayers.get(guildId);
     player.play(createBufferResource(audio));

@@ -1,4 +1,5 @@
 import { Communicate } from 'edge-tts-universal';
+import { PassThrough } from 'stream';
 import { VOICES } from './config.js';
 import { preprocessText } from './textProcessor.js';
 
@@ -34,20 +35,33 @@ async function kokoroTTS(text, voiceKey) {
   return streamToBuffer(response.body);
 }
 
+function edgeTTSStream(text, voice) {
+  const communicate = new Communicate(text, {
+    voice: voice.name,
+    rate: EDGE_RATE,
+  });
+  const pass = new PassThrough();
+
+  (async () => {
+    try {
+      for await (const chunk of communicate.stream()) {
+        if (chunk.type === 'audio' && chunk.data) pass.write(chunk.data);
+      }
+      pass.end();
+    } catch (err) {
+      pass.destroy(err);
+    }
+  })();
+
+  return pass;
+}
+
 export async function generateTTS(text, voiceKey) {
   const voice = VOICES[voiceKey];
   const processedText = preprocessText(text);
 
   if (voice.type === 'edge') {
-    const communicate = new Communicate(processedText, {
-      voice: voice.name,
-      rate: EDGE_RATE,
-    });
-    const chunks = [];
-    for await (const chunk of communicate.stream()) {
-      if (chunk.type === 'audio' && chunk.data) chunks.push(chunk.data);
-    }
-    return Buffer.concat(chunks);
+    return edgeTTSStream(processedText, voice);
   }
 
   if (voice.type === 'melo') {

@@ -30,11 +30,14 @@ export function registerMessageHandler(client) {
     if (!voiceChannel) return;
 
     const voiceKey = getUserVoice(message.author.id);
-    try {
-      await playTTS(cleaned, voiceKey, message.guild.id, voiceChannel, null, message.author.id);
-    } catch (err) {
+    const reactFail = (err) => {
       logError(`메시지 TTS 처리 실패 · guild: ${message.guild.id} · ${err.message}`, 'ERROR', err.stack);
       message.react('<:speakfail:1498223231369482381>').catch(() => {});
+    };
+    try {
+      await playTTS(cleaned, voiceKey, message.guild.id, voiceChannel, null, message.author.id, reactFail);
+    } catch (err) {
+      reactFail(err);
     }
   });
 }
