@@ -52,9 +52,11 @@ async function processQueue(guildId) {
 
   processingGuilds.add(guildId);
   const item = queue.shift();
+  console.log(`[QUEUE] 꺼냄 text="${(item.pending?.text ?? '(buffer)').slice(0, 10)}"`);
   let audio = item.audio;
 
   if (!audio && item.pending) {
+    console.log(`[QUEUE] 생성 시작 text="${item.pending.text.slice(0, 10)}"`);
     try {
       audio = await generateTTS(item.pending.text, item.pending.voiceKey);
     } catch (err) {
@@ -128,9 +130,10 @@ export async function playTTS(text, voiceKey, guildId, voiceChannel, interaction
       if (!ttsQueues.has(guildId)) ttsQueues.set(guildId, []);
 
       if (voice?.type === 'edge') {
-        // Edge는 미리 연결을 열어두면 여러 연결이 겹칠 수 있어, 재생 직전까지 생성을 미룬다
+        console.log(`[CHAIN] 도착 text="${text.slice(0, 10)}"`);
         logTTS(guildId, userId, voiceKey);
         ttsQueues.get(guildId).push({ pending: { text, voiceKey, onPlaybackError } });
+        console.log(`[CHAIN] 큐 추가 text="${text.slice(0, 10)}" len=${ttsQueues.get(guildId).length}`);
         processQueue(guildId);
         return;
       }
