@@ -24,6 +24,7 @@ function createBufferResource(audio) {
 function attachStreamErrorHandler(audio, onError) {
   if (Buffer.isBuffer(audio) || typeof audio?.on !== 'function') return;
   audio.on('error', (err) => {
+    if (err.code === 'ERR_STREAM_PREMATURE_CLOSE') return; // 스킵/중단 등으로 재생이 끊긴 것 - 실제 실패 아님
     if (onError) onError(err);
     else logError(`TTS 스트리밍 오류: ${err.message}`, 'ERROR', err.stack);
   });
@@ -45,7 +46,7 @@ async function processQueue(guildId) {
   const queue = ttsQueues.get(guildId);
   if (!queue || queue.length === 0) return;
   const player = audioPlayers.get(guildId);
-  if (!player || player.state.status === AudioPlayerStatus.Playing) return;
+  if (!player || player.state.status !== AudioPlayerStatus.Idle) return;
   const { audio } = queue.shift();
   const resource = createBufferResource(audio);
   player.play(resource);

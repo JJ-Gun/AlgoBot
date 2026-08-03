@@ -41,15 +41,27 @@ function edgeTTSStream(text, voice) {
     rate: EDGE_RATE,
   });
   const pass = new PassThrough();
+  let chunkCount = 0;
+  let byteCount = 0;
 
   (async () => {
     try {
       for await (const chunk of communicate.stream()) {
-        if (chunk.type === 'audio' && chunk.data) pass.write(chunk.data);
+        if (pass.destroyed) {
+          console.log(`[EDGE] 중간에 파괴됨 (chunks=${chunkCount}, bytes=${byteCount}) text="${text.slice(0, 20)}"`);
+          return;
+        }
+        if (chunk.type === 'audio' && chunk.data) {
+          chunkCount++;
+          byteCount += chunk.data.length;
+          pass.write(chunk.data);
+        }
       }
-      pass.end();
+      console.log(`[EDGE] 정상 완료 (chunks=${chunkCount}, bytes=${byteCount}) text="${text.slice(0, 20)}"`);
+      if (!pass.destroyed) pass.end();
     } catch (err) {
-      pass.destroy(err);
+      console.log(`[EDGE] 에러 발생 (chunks=${chunkCount}, bytes=${byteCount}): ${err.message}`);
+      if (!pass.destroyed) pass.destroy(err);
     }
   })();
 

@@ -16,6 +16,14 @@ const logs = ref<LogEntry[]>([])
 const loading = ref(true)
 const expanded = ref<Set<number>>(new Set())
 
+const filterYear = ref('')
+const filterMonth = ref('')
+const filterDay = ref('')
+const filterLevel = ref('')
+
+const currentYear = new Date().getFullYear()
+const yearOptions = [currentYear, currentYear - 1, currentYear - 2]
+
 function formatTime(dateStr: string) {
   const d = new Date(dateStr.replace(' ', 'T') + 'Z')
   return d.toLocaleString('ko-KR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' })
@@ -30,9 +38,24 @@ function toggle(id: number) {
   expanded.value = new Set(expanded.value)
 }
 
+function resetFilters() {
+  filterYear.value = ''
+  filterMonth.value = ''
+  filterDay.value = ''
+  filterLevel.value = ''
+  loadLogs()
+}
+
 async function loadLogs() {
+  loading.value = true
   try {
-    const res = await fetch(`${import.meta.env.VITE_API_URL}/admin/logs`, {
+    const params = new URLSearchParams()
+    if (filterYear.value) params.set('year', filterYear.value)
+    if (filterMonth.value) params.set('month', filterMonth.value)
+    if (filterDay.value) params.set('day', filterDay.value)
+    if (filterLevel.value) params.set('level', filterLevel.value)
+
+    const res = await fetch(`${import.meta.env.VITE_API_URL}/admin/logs?${params.toString()}`, {
       credentials: 'include'
     })
     if (!res.ok) throw new Error('로그 조회 실패')
@@ -50,6 +73,27 @@ onMounted(loadLogs)
 <template>
   <div class="logs">
     <div class="page-title">에러 로그</div>
+
+    <div class="filter-bar">
+      <select v-model="filterYear" @change="loadLogs">
+        <option value="">전체 연도</option>
+        <option v-for="y in yearOptions" :key="y" :value="y">{{ y }}년</option>
+      </select>
+      <select v-model="filterMonth" @change="loadLogs">
+        <option value="">전체 월</option>
+        <option v-for="m in 12" :key="m" :value="m">{{ m }}월</option>
+      </select>
+      <select v-model="filterDay" @change="loadLogs">
+        <option value="">전체 일</option>
+        <option v-for="d in 31" :key="d" :value="d">{{ d }}일</option>
+      </select>
+      <select v-model="filterLevel" @change="loadLogs">
+        <option value="">전체 종류</option>
+        <option value="ERROR">ERROR</option>
+        <option value="WARN">WARN</option>
+      </select>
+      <button class="reset-btn" @click="resetFilters">초기화</button>
+    </div>
 
     <div v-if="loading" class="loading-notice">불러오는 중...</div>
     <div v-else-if="logs.length === 0" class="empty-notice">기록된 로그가 없습니다.</div>
@@ -82,6 +126,36 @@ onMounted(loadLogs)
   font-size: 18px;
   font-weight: 500;
   margin-bottom: 20px;
+}
+
+.filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.filter-bar select {
+  font-size: 13px;
+  padding: 6px 10px;
+  border: 0.5px solid #e0e0e0;
+  border-radius: 8px;
+  background: #fff;
+  color: #333;
+}
+
+.reset-btn {
+  font-size: 13px;
+  padding: 6px 12px;
+  border: 0.5px solid #e0e0e0;
+  border-radius: 8px;
+  background: #fff;
+  color: #666;
+  cursor: pointer;
+}
+
+.reset-btn:hover {
+  background: #f5f5f5;
 }
 
 .loading-notice,
