@@ -16,6 +16,98 @@ const numberMap = {
   '5': '오', '6': '육', '7': '칠', '8': '팔', '9': '구'
 };
 
+// 전화번호/코드처럼 한 글자씩 읽을 때는 0을 "공"으로 읽음
+const sequentialDigitMap = { ...numberMap, '0': '공' };
+
+// 고유어 숫자를 쓰는 단위들 (필요하면 추가/삭제하세요)
+const NATIVE_COUNTERS = new Set([
+  '시', '개', '명', '살', '마리', '장', '권', '그루', '채',
+  '대', '잔', '병', '켤레', '알', '가지', '벌', '자루', '그릇', '줄', '다발', '사람',
+]);
+
+// 고유어 숫자 (1~99)
+const nativeOnes = ['', '한', '두', '세', '네', '다섯', '여섯', '일곱', '여덟', '아홉'];
+const nativeTens = ['', '열', '스물', '서른', '마흔', '쉰', '예순', '일흔', '여든', '아흔'];
+
+function nativeKoreanNumber(n) {
+  if (n <= 0 || n > 99) return null;
+  const tens = Math.floor(n / 10);
+  const ones = n % 10;
+  return nativeTens[tens] + nativeOnes[ones];
+}
+
+// 한자어 숫자
+const sinoDigits = ['', '일', '이', '삼', '사', '오', '육', '칠', '팔', '구'];
+const sinoSmallUnits = ['', '십', '백', '천'];
+const sinoBigUnits = ['', '만', '억', '조', '경'];
+
+function sinoKoreanGroup(num) {
+  const digits = String(num).padStart(4, '0').split('').map(Number);
+  let result = '';
+  for (let i = 0; i < 4; i++) {
+    const d = digits[i];
+    const unit = sinoSmallUnits[3 - i];
+    if (d === 0) continue;
+    result += (d === 1 && unit) ? unit : sinoDigits[d] + unit;
+  }
+  return result;
+}
+
+function sinoKoreanNumber(n) {
+  if (n === 0) return '영';
+  const groups = [];
+  let num = n;
+  while (num > 0) {
+    groups.push(num % 10000);
+    num = Math.floor(num / 10000);
+  }
+  let result = '';
+  for (let i = groups.length - 1; i >= 0; i--) {
+    if (groups[i] === 0) continue;
+    result += sinoKoreanGroup(groups[i]) + (sinoBigUnits[i] || '');
+  }
+  return result;
+}
+
+// 전화번호처럼 앞자리가 0인 숫자, 그 숫자가 포함된 하이픈 체인을 찾아서 표시
+function isLeadingZero(token) {
+  return token.length > 1 && token[0] === '0';
+}
+
+function markPhoneCodePatterns(tokens) {
+  const digitByDigit = new Set();
+  const codeHyphen = new Set();
+  const dashHyphen = new Set();
+
+  let i = 0;
+  while (i < tokens.length) {
+    if (/^[0-9]+$/.test(tokens[i])) {
+      const chainNumberIdx = [i];
+      const chainHyphenIdx = [];
+      let j = i;
+      while (tokens[j + 1] === '-' && /^[0-9]+$/.test(tokens[j + 2])) {
+        chainHyphenIdx.push(j + 1);
+        chainNumberIdx.push(j + 2);
+        j += 2;
+      }
+      if (chainHyphenIdx.length > 0) {
+        const isCode = chainNumberIdx.some(idx => isLeadingZero(tokens[idx]));
+        if (isCode) {
+          chainNumberIdx.forEach(idx => digitByDigit.add(idx));
+          chainHyphenIdx.forEach(idx => codeHyphen.add(idx));
+        } else {
+          chainHyphenIdx.forEach(idx => dashHyphen.add(idx));
+        }
+        i = j + 1;
+        continue;
+      }
+    }
+    i++;
+  }
+
+  return { digitByDigit, codeHyphen, dashHyphen };
+}
+
 const jamoMap = {
   'ㄱ': '기역', 'ㄴ': '니은', 'ㄷ': '디귿', 'ㄹ': '리을', 'ㅁ': '미음',
   'ㅂ': '비읍', 'ㅅ': '시옷', 'ㅇ': '이응', 'ㅈ': '지읒', 'ㅊ': '치읓',
@@ -51,14 +143,42 @@ function englishToKorean(word) {
 export function preprocessText(text) {
   text = limitRepeatedChars(text);
   const tokens = text.match(/[a-zA-Z]+|[0-9]+|[ㄱ-ㅎㅏ-ㅣ]|[가-힣]|\s|./g) || [];
-  return tokens.map(token => {
-    if (/^[a-zA-Z]+$/.test(token)) return englishToKorean(token);
-    if (/^[0-9]+$/.test(token)) return token.split('').map(d => numberMap[d]).join('');
-    if (/^[ㄱ-ㅎㅏ-ㅣ]$/.test(token)) return jamoMap[token] || token;
-    if (specialMap[token]) return specialMap[token];
-    if (/^[^\w\s가-힣]$/.test(token)) return ''; // 나머지 특수기호 제거
-    return token;
-  }).join('');
+  const { digitByDigit, codeHyphen, dashHyphen } = markPhoneCodePatterns(tokens);
+  const result = [];
+
+  for (let i = 0; i < tokens.length; i++) {
+    const token = tokens[i];
+
+    if (/^[a-zA-Z]+$/.test(token)) {
+      result.push(englishToKorean(token));
+    } else if (/^[0-9]+$/.test(token)) {
+      if (digitByDigit.has(i) || isLeadingZero(token)) {
+        result.push(token.split('').map(d => sequentialDigitMap[d]).join(''));
+      } else {
+        const n = Number(token);
+        const next = tokens[i + 1];
+        if (NATIVE_COUNTERS.has(next)) {
+          result.push(nativeKoreanNumber(n) ?? sinoKoreanNumber(n));
+        } else {
+          result.push(sinoKoreanNumber(n));
+        }
+      }
+    } else if (token === '-' && codeHyphen.has(i)) {
+      result.push('에');
+    } else if (token === '-' && dashHyphen.has(i)) {
+      result.push('다시');
+    } else if (/^[ㄱ-ㅎㅏ-ㅣ]$/.test(token)) {
+      result.push(jamoMap[token] || token);
+    } else if (specialMap[token]) {
+      result.push(specialMap[token]);
+    } else if (/^[^\w\s가-힣]$/.test(token)) {
+      result.push(''); // 나머지 특수기호 제거
+    } else {
+      result.push(token);
+    }
+  }
+
+  return result.join('');
 }
 
 // kokoro용 변환
