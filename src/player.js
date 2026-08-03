@@ -13,6 +13,7 @@ import db from '../server/db/index.js';
 import { logError } from '../server/db/logger.js';
 
 const generateChains = new Map();
+const processingGuilds = new Set();
 
 function createBufferResource(audio) {
   const input = Buffer.isBuffer(audio) ? Readable.from(audio) : audio;
@@ -43,13 +44,32 @@ function logTTS(guildId, userId, voiceKey) {
 }
 
 async function processQueue(guildId) {
+  if (processingGuilds.has(guildId)) return;
   const queue = ttsQueues.get(guildId);
   if (!queue || queue.length === 0) return;
   const player = audioPlayers.get(guildId);
   if (!player || player.state.status !== AudioPlayerStatus.Idle) return;
-  const { audio } = queue.shift();
+
+  processingGuilds.add(guildId);
+  const item = queue.shift();
+  let audio = item.audio;
+
+  if (!audio && item.pending) {
+    try {
+      audio = await generateTTS(item.pending.text, item.pending.voiceKey);
+    } catch (err) {
+      logError(`TTS 생성 실패 (${item.pending.voiceKey}) · guild: ${guildId} · ${err.message}`, 'ERROR', err.stack);
+      if (item.pending.onPlaybackError) item.pending.onPlaybackError(err);
+      processingGuilds.delete(guildId);
+      processQueue(guildId);
+      return;
+    }
+    attachStreamErrorHandler(audio, item.pending.onPlaybackError);
+  }
+
   const resource = createBufferResource(audio);
   player.play(resource);
+  processingGuilds.delete(guildId);
   player.once(AudioPlayerStatus.Idle, () => {
     processQueue(guildId);
   });
@@ -102,8 +122,19 @@ export async function playTTS(text, voiceKey, guildId, voiceChannel, interaction
   const isQueueMode = queueMode.get(guildId) ?? false;
 
   if (isQueueMode) {
+    const voice = VOICES[voiceKey];
     const prevChain = generateChains.get(guildId) ?? Promise.resolve();
     const newChain = prevChain.then(async () => {
+      if (!ttsQueues.has(guildId)) ttsQueues.set(guildId, []);
+
+      if (voice?.type === 'edge') {
+        // Edge는 미리 연결을 열어두면 여러 연결이 겹칠 수 있어, 재생 직전까지 생성을 미룬다
+        logTTS(guildId, userId, voiceKey);
+        ttsQueues.get(guildId).push({ pending: { text, voiceKey, onPlaybackError } });
+        processQueue(guildId);
+        return;
+      }
+
       let audio;
       try {
         const t0 = performance.now();
@@ -116,7 +147,6 @@ export async function playTTS(text, voiceKey, guildId, voiceChannel, interaction
       }
       attachStreamErrorHandler(audio, onPlaybackError);
       logTTS(guildId, userId, voiceKey);
-      if (!ttsQueues.has(guildId)) ttsQueues.set(guildId, []);
       ttsQueues.get(guildId).push({ audio });
       processQueue(guildId);
     });
