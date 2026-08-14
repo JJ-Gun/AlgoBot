@@ -87,6 +87,7 @@ def synthesize():
     data = request.json
     text = data.get('text', '')
     voice = data.get('voice', 'af_heart')
+    user_speed = data.get('speed', 1.0) or 1.0
 
     if not text:
         return {'error': 'text is required'}, 400
@@ -98,8 +99,9 @@ def synthesize():
 
     infer_start = time.time()
 
+    effective_speed = SPEED * user_speed
     audio_chunks = []
-    generator = pipeline(kokoro_text, voice=voice, speed=SPEED)
+    generator = pipeline(kokoro_text, voice=voice, speed=effective_speed)
     for _, _, audio in generator:
         audio_chunks.append(audio)
 

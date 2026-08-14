@@ -5,8 +5,6 @@ import { preprocessText } from './textProcessor.js';
 
 console.log('✅ 모든 TTS 준비 완료!');
 
-const EDGE_RATE = '+0%';
-
 async function streamToBuffer(stream) {
   const chunks = [];
   for await (const chunk of stream) {
@@ -15,30 +13,32 @@ async function streamToBuffer(stream) {
   return Buffer.concat(chunks);
 }
 
-async function meloTTS(text) {
+async function meloTTS(text, speed) {
   const response = await fetch('http://127.0.0.1:5050/tts', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text }),
+    body: JSON.stringify({ text, speed }),
   });
   if (!response.ok) throw new Error('MeloTTS 서버 오류');
   return streamToBuffer(response.body);
 }
 
-async function kokoroTTS(text, voiceKey) {
+async function kokoroTTS(text, voiceKey, speed) {
   const response = await fetch('http://127.0.0.1:5051/tts', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text, voice: voiceKey }),
+    body: JSON.stringify({ text, voice: voiceKey, speed }),
   });
   if (!response.ok) throw new Error('Kokoro 서버 오류');
   return streamToBuffer(response.body);
 }
 
-function edgeTTSStream(text, voice) {
+function edgeTTSStream(text, voice, speed) {
+  const ratePercent = Math.round((speed - 1) * 100);
+  const rate = `${ratePercent >= 0 ? '+' : ''}${ratePercent}%`;
   const communicate = new Communicate(text, {
     voice: voice.name,
-    rate: EDGE_RATE,
+    rate,
   });
   const pass = new PassThrough();
   let chunkCount = 0;
@@ -68,20 +68,20 @@ function edgeTTSStream(text, voice) {
   return pass;
 }
 
-export async function generateTTS(text, voiceKey) {
+export async function generateTTS(text, voiceKey, speed = 1.0) {
   const voice = VOICES[voiceKey];
   const processedText = preprocessText(text);
 
   if (voice.type === 'edge') {
-    return edgeTTSStream(processedText, voice);
+    return edgeTTSStream(processedText, voice, speed);
   }
 
   if (voice.type === 'melo') {
-    return await meloTTS(preprocessText(text, false));
+    return await meloTTS(preprocessText(text, false), speed);
   }
 
   if (voice.type === 'kokoro') {
-    return await kokoroTTS(processedText, voiceKey);
+    return await kokoroTTS(processedText, voiceKey, speed);
   }
 
   throw new Error('지원되지 않는 voice');

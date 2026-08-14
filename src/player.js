@@ -7,7 +7,7 @@ import {
   StreamType,
 } from '@discordjs/voice';
 import { Readable } from 'stream';
-import { audioPlayers, queueMode, ttsQueues, VOICES } from './config.js';
+import { audioPlayers, queueMode, ttsQueues, VOICES, getUserSpeed } from './config.js';
 import { generateTTS } from './tts.js';
 import db from '../server/db/index.js';
 import { logError } from '../server/db/logger.js';
@@ -58,7 +58,7 @@ async function processQueue(guildId) {
   if (!audio && item.pending) {
     console.log(`[QUEUE] 생성 시작 text="${item.pending.text.slice(0, 10)}"`);
     try {
-      audio = await generateTTS(item.pending.text, item.pending.voiceKey);
+      audio = await generateTTS(item.pending.text, item.pending.voiceKey, item.pending.speed);
     } catch (err) {
       logError(`TTS 생성 실패 (${item.pending.voiceKey}) · guild: ${guildId} · ${err.message}`, 'ERROR', err.stack);
       if (item.pending.onPlaybackError) item.pending.onPlaybackError(err);
@@ -98,6 +98,7 @@ export function clearQueue(guildId) {
 }
 
 export async function playTTS(text, voiceKey, guildId, voiceChannel, interaction = null, userId = null, onPlaybackError = null) {
+  const speed = userId ? getUserSpeed(userId) : 1.0;
   let connection = getVoiceConnection(guildId);
 
   if (!connection) {
@@ -140,7 +141,7 @@ export async function playTTS(text, voiceKey, guildId, voiceChannel, interaction
       if (voice?.type === 'edge') {
         console.log(`[CHAIN] 도착 text="${text.slice(0, 10)}"`);
         logTTS(guildId, userId, voiceKey);
-        ttsQueues.get(guildId).push({ pending: { text, voiceKey, onPlaybackError } });
+        ttsQueues.get(guildId).push({ pending: { text, voiceKey, speed, onPlaybackError } });
         console.log(`[CHAIN] 큐 추가 text="${text.slice(0, 10)}" len=${ttsQueues.get(guildId).length}`);
         processQueue(guildId);
         return;
@@ -149,7 +150,7 @@ export async function playTTS(text, voiceKey, guildId, voiceChannel, interaction
       let audio;
       try {
         const t0 = performance.now();
-        audio = await generateTTS(text, voiceKey);
+        audio = await generateTTS(text, voiceKey, speed);
         console.log(`[TTS] generated ${(performance.now() - t0).toFixed(0)}ms`);
       } catch (err) {
         logError(`TTS 생성 실패 (${voiceKey}) · guild: ${guildId} · ${err.message}`, 'ERROR', err.stack);
@@ -166,7 +167,7 @@ export async function playTTS(text, voiceKey, guildId, voiceChannel, interaction
     let audio;
     try {
       const t0 = performance.now();
-      audio = await generateTTS(text, voiceKey);
+      audio = await generateTTS(text, voiceKey, speed);
       console.log(`[TTS] generated ${(performance.now() - t0).toFixed(0)}ms`);
     } catch (err) {
       logError(`TTS 생성 실패 (${voiceKey}) · guild: ${guildId} · ${err.message}`, 'ERROR', err.stack);

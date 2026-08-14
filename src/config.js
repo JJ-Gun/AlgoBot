@@ -50,6 +50,11 @@ export function getUserVoice(userId) {
   return row?.voice_key || DEFAULT_VOICE;
 }
 
+export function getUserSpeed(userId) {
+  const row = db.prepare('SELECT speed FROM users WHERE id = ?').get(userId);
+  return row?.speed ?? 1.0;
+}
+
 export function setUserVoice(userId, voiceKey, username = null) {
   const existing = db.prepare('SELECT id FROM users WHERE id = ?').get(userId);
   if (existing) {

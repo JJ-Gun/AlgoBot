@@ -40,11 +40,12 @@ def split_text(text, max_len=MAX_CHUNK_LEN):
     return chunks
 
 
-def infer_chunk(t):
+def infer_chunk(t, user_speed=1.0):
     device = tts_kr.device
     bert, ja_bert, phones, tones, lang_ids = melo_utils.get_text_for_tts_infer(
         t, tts_kr.language, tts_kr.hps, device, tts_kr.symbol_to_id
     )
+    effective_speed = SPEED * user_speed
     with torch.no_grad():
         x_tst = phones.to(device).unsqueeze(0)
         tones = tones.to(device).unsqueeze(0)
@@ -55,17 +56,17 @@ def infer_chunk(t):
         speakers = torch.LongTensor([speaker_kr]).to(device)
         audio = tts_kr.model.infer(
             x_tst, x_tst_lengths, speakers, tones, lang_ids, bert, ja_bert,
-            sdp_ratio=0.2, noise_scale=0.6, noise_scale_w=0.8, length_scale=1.0 / SPEED
+            sdp_ratio=0.2, noise_scale=0.6, noise_scale_w=0.8, length_scale=1.0 / effective_speed
         )[0][0, 0].data.cpu().float().numpy()
     return audio
 
 
-def infer_to_bytes(text):
+def infer_to_bytes(text, user_speed=1.0):
     sentences = tts_kr.split_sentences_into_pieces(text, tts_kr.language)
     audio_list = []
     for s in sentences:
         for chunk in split_text(s):
-            audio = infer_chunk(chunk)
+            audio = infer_chunk(chunk, user_speed)
             print(f'[CHUNK] len={len(audio)} text={chunk[:20]}')
             audio_list.append(audio)
     audio_all = np.concatenate(audio_list)
@@ -88,6 +89,7 @@ def synthesize():
     req_start = time.time()
     data = request.json
     text = data.get('text', '')
+    user_speed = data.get('speed', 1.0) or 1.0
 
     if not text:
         return {'error': 'text is required'}, 400
@@ -101,7 +103,7 @@ def synthesize():
     print(f'[REQ ] {text}')
     infer_start = time.time()
 
-    buf = infer_to_bytes(text)
+    buf = infer_to_bytes(text, user_speed)
 
     infer_time = time.time() - infer_start
     print(f'[TTS ] infer {infer_time:.3f}s')
