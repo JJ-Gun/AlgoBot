@@ -84,6 +84,14 @@ export function skipTTS(guildId) {
   return true;
 }
 
+export function skipAllTTS(guildId) {
+  clearQueue(guildId);
+  const player = audioPlayers.get(guildId);
+  if(!player) return false;
+  player.stop();
+  return true;
+}
+
 export function clearQueue(guildId) {
   ttsQueues.set(guildId, []);
   generateChains.set(guildId, Promise.resolve());

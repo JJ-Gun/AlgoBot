@@ -1,7 +1,7 @@
 import { Events, ActionRowBuilder, StringSelectMenuBuilder, EmbedBuilder } from 'discord.js';
 import { getVoiceConnection, joinVoiceChannel, createAudioPlayer } from '@discordjs/voice';
 import { VOICES, DEFAULT_VOICE, audioPlayers, ttsChanels, settings, saveSettings, queueMode, getUserVoice, setUserVoice } from '../config.js';
-import { playTTS, skipTTS } from '../player.js';
+import { clearQueue, playTTS, skipTTS, skipAllTTS } from '../player.js';
 import {
   getSession, resetSession, clearSession,
   buildMainRows, mainSummary,
@@ -127,6 +127,7 @@ export function registerInteractionHandler(client) {
         });
         const player = createAudioPlayer();
         audioPlayers.set(interaction.guild.id, player);
+        clearQueue(interaction.guild.id);
         connection.subscribe(player);
         return interaction.reply({ content: `**${voiceChannel.name}** 채널 입장!`, flags: 64 });
       }
@@ -235,6 +236,10 @@ export function registerInteractionHandler(client) {
       if (commandName === '스킵') {
         const success = skipTTS(interaction.guild.id);
         return interaction.reply({ content: success ? '건너뜁니다!' : '재생 중인 문장이 없어요.', flags: 64 });
+      }
+      if (commandName === '전체스킵') {
+        const success = skipAllTTS(interaction.guild.id);
+        return interaction.reply({ content: success ? '대기열을 모두 비우고 건너뛰었어요!' : '재생 중인 문장이 없어요.', flags: 64});
       }
       if (commandName === '청소') {
         resetSession(interaction.user.id);
